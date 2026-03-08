@@ -10,6 +10,7 @@ import time
 import requests
 import json
 import logging
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [BRAIN_FACTORY] - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -140,6 +141,14 @@ def generate_hypothesis() -> str:
     return expression
 
 def run_factory():
+    # --- STEP 0: HYBRID AUTH (RULE-025) ---
+    env_path = Path(r"C:\Users\admin\.antigravity\master\.env")
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
     email = os.getenv("BRAIN_EMAIL")
     password = os.getenv("BRAIN_PASSWORD")
     
