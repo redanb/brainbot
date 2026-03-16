@@ -1,0 +1,55 @@
+name: Alpha Factory Hub (Cloud)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_universe:
+        description: 'Universe to process (e.g. TOP3000)'
+        required: false
+        default: 'TOP3000'
+  schedule:
+    - cron: '0 */2 * * *' # Run every 2 hours for zero-downtime background simulation
+
+jobs:
+  simulate-alphas:
+    runs-on: ubuntu-latest
+    
+    env:
+      # These must be configured in GitHub Settings -> Secrets and variables -> Actions
+      WORLDQUANT_USERNAME: ${{ secrets.WORLDQUANT_USERNAME }}
+      WORLDQUANT_PASSWORD: ${{ secrets.WORLDQUANT_PASSWORD }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
+      GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MAX_API_CALLS: "100" # Safe limit for cloud runner
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Install necessary LLM and data packages matching requirements.txt or current usage
+        pip install requests google-genai openai groq anthropic pandas numpy xgboost lightgbm scikit-learn numerapi
+
+    - name: Run Global LLM Router & Factory Initialization
+      run: |
+        echo "Creating virtual master directory for llm_router dependency..."
+        mkdir -p ~/.antigravity/master
+        
+        # We assume llm_router.py and task_broker.py are synced or part of the repo
+        # If not, the script falls back gracefully, but we copy them if they exist
+        if [ -f "llm_router.py" ]; then cp llm_router.py ~/.antigravity/master/; fi
+        if [ -f "task_broker.py" ]; then cp task_broker.py ~/.antigravity/master/; fi
+
+    - name: Execute God-Level Alpha Factory
+      run: |
+        python brainbot/alpha_factory.py
+      continue-on-error: true
