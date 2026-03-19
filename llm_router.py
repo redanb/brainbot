@@ -646,9 +646,9 @@ def route_query(system_prompt: str, user_query: str, depth: str = "STANDARD",
     }
 
     claude_model_map = {
-        "FAST": "claude-3-5-haiku-latest",
-        "STANDARD": "claude-3-7-sonnet-latest",
-        "DEEP": "claude-3-7-sonnet-latest",
+        "FAST": "claude-3-5-haiku-20241022",
+        "STANDARD": "claude-3-5-sonnet-20241022",
+        "DEEP": "claude-3-5-sonnet-20241022",
     }
 
     perplexity_model_map = {
