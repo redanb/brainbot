@@ -181,7 +181,46 @@ ALPHA_LIBRARY = [
     "group_neutralize(signed_power(rank(-1 * ts_delta(close, 5)), 1.5), subindustry)",
     "group_neutralize(signed_power(rank(-1 * ts_corr(close, volume, 10)), 1.5), subindustry)",
     "group_neutralize(rank(-1 * ts_mean(ts_delta(close, 1), 5) / (ts_std_dev(close, 20) + 0.0001)), subindustry)",
+
+    # === TIER 9: ULTRA-HIGH-FITNESS (Targeting Fitness >= 1.0) ===
+    # WQ Fitness = returns * sqrt(252) / drawdown (approx)
+    # Higher fitness = higher daily returns, lower drawdown
+    # Short-lookback reversals with tight group neutralization maximize this ratio
+    #
+    # Strategy: 1-3 day reversals with aggressive normalization
+    "group_neutralize(rank(-1 * ts_delta(close, 1)), subindustry)",
+    "group_neutralize(rank(-1 * ts_delta(close, 2)), subindustry)",
+    "group_neutralize(rank(-1 * ts_delta(open, 1)), subindustry)",
+    "group_neutralize(rank(-1 * ts_delta(open, 2)), subindustry)",
+    "group_neutralize(rank(open - close), subindustry)",
+    "group_neutralize(rank(-1 * (close - open)), subindustry)",
+    "group_neutralize(rank(vwap - close), subindustry)",
+    "group_neutralize(rank(-1 * (close - vwap)), subindustry)",
+
+    # Very short decay (aggressive position rotation)
+    "group_neutralize(rank(ts_decay_linear(-1 * ts_delta(close, 1), 3)), subindustry)",
+    "group_neutralize(rank(ts_decay_linear(-1 * ts_delta(close, 2), 3)), subindustry)",
+    "group_neutralize(rank(ts_decay_linear(open - close, 3)), subindustry)",
+
+    # Short-window zscore (focuses on recent regime)
+    "group_neutralize(rank(-1 * ts_zscore(close, 5)), subindustry)",
+    "group_neutralize(rank(-1 * ts_zscore(close, 10)), subindustry)",
+    "group_neutralize(rank(ts_zscore(open - close, 10)), subindustry)",
+    "group_neutralize(rank(-1 * ts_zscore(vwap - close, 5)), subindustry)",
+
+    # Volume-weighted reversals
+    "group_neutralize(rank(-1 * ts_delta(close, 1) * ts_rank(volume, 5)), subindustry)",
+    "group_neutralize(rank(-1 * ts_delta(close, 1) * log(volume + 1)), subindustry)",
+    "group_neutralize(rank((vwap - close) * ts_rank(volume, 10)), subindustry)",
+    "group_neutralize(rank(-1 * (close - open) * ts_rank(volume, 5)), subindustry)",
+
+    # Advanced signed_power for skewness exploitation
+    "group_neutralize(signed_power(rank(-1 * ts_delta(close, 1)), 2.0), subindustry)",
+    "group_neutralize(signed_power(rank(-1 * ts_delta(close, 2)), 1.5), subindustry)",
+    "group_neutralize(signed_power(rank(open - close), 2.0), subindustry)",
+    "group_neutralize(signed_power(rank(vwap - close), 1.5), subindustry)",
 ]
+
 
 
 # ─── BRAIN API CLASS ──────────────────────────────────────────────────────────
