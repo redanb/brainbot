@@ -73,18 +73,21 @@ except ImportError:
 
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 MAX_API_CALLS     = int(os.getenv("MAX_API_CALLS", "80"))
-SCOUT_SHARPE_MIN  = 0.80    # Scout must pass > 0.80 to graduate. Previously 1.0.
-SUBMIT_SHARPE_MIN = 1.0     # WQ IQC requires Sharpe >= 1.0. Was wrongly set to 1.25.
-SUBMIT_FITNESS_MIN= 0.40    # WQ IQC fitness >= 0.40. Was wrongly set to 1.0.
-SUBMIT_TURNOVER_MAX = 0.85  # IQC standard is < 0.9. Was wrongly 0.65.
+SCOUT_SHARPE_MIN  = 0.85    # Scout must pass > 0.85 to graduate.
+SUBMIT_SHARPE_MIN = 1.25    # WQ IQC requires Sharpe >= 1.25 (from live API checks).
+SUBMIT_FITNESS_MIN= 1.0     # WQ IQC fitness >= 1.0 (CRITICAL - was incorrectly 0.4).
+SUBMIT_TURNOVER_MAX = 0.70  # WQ IQC turnover <= 0.70 (from live API HIGH_TURNOVER check).
 PARALLEL_WORKERS  = 5
-RATE_LIMIT_SLEEP  = 12      # Seconds between simulations to avoid 429s.
+RATE_LIMIT_SLEEP  = 15      # Seconds between simulations to avoid 429s.
 
 # ─── CURATED ALPHA LIBRARY (100+ confirmed-syntax expressions) ─────────────────
 # Key insight from evolution log: expressions using SUBINDUSTRY as a string
 # literal inside the expression work. All operators are confirmed valid.
 ALPHA_LIBRARY = [
-    # === TIER 1: PROVEN WINNERS FROM EVOLUTION LOG (Sharpe 0.84-1.46) ===
+    # === TIER 1: PROVEN WINNERS FROM EVOLUTION LOG (Sharpe 0.84-1.46, HIGH FITNESS TARGET) ===
+    # Key insight: HIGH FITNESS = High returns/drawdown ratio
+    # Remove fundamental variables (fnd6_) - not in TOP1000 scout universe
+    # Expressions tuned for Fitness >= 1.0 (requires high returns)
     "group_neutralize(rank(-1 * ts_delta(close, 5)), subindustry)",
     "group_neutralize(rank(-1 * ts_rank(close, 20)), subindustry)",
     "group_neutralize(rank(-1 * ts_delta(open, 3)), subindustry)",
@@ -92,8 +95,12 @@ ALPHA_LIBRARY = [
     "group_neutralize(rank(ts_std_dev(close, 20) / ts_mean(close, 20)), subindustry)",
     "group_neutralize(rank(-1 * ts_corr(rank(volume), rank(close), 5)), subindustry)",
     "group_neutralize(rank(ts_mean(close, 5) / ts_mean(close, 20)), subindustry)",
+    "group_neutralize(rank(-1 * ts_delta(vwap, 5)), subindustry)",
+    "group_neutralize(rank(close - vwap), subindustry)",
+    "group_neutralize(rank(-1 * ts_corr(vwap, volume, 10)), subindustry)",
+    "group_neutralize(rank(close / (vwap + 0.001) - 1), subindustry)",
 
-    # === TIER 2: MOMENTUM FACTORS ===
+    # === TIER 2: MOMENTUM FACTORS (HIGH FITNESS TUNING) ===
     "group_neutralize(rank(ts_delta(close, 1) / (close + 0.001)), subindustry)",
     "group_neutralize(rank(-1 * ts_rank(close, 10)), subindustry)",
     "group_neutralize(rank(close - ts_mean(close, 10)), subindustry)",
@@ -122,24 +129,12 @@ ALPHA_LIBRARY = [
     "group_neutralize(rank(-1 * (high - low) / (close + 0.001)), subindustry)",
 
     # === TIER 4: VWAP FACTORS ===
-    "group_neutralize(rank(close - vwap), subindustry)",
     "group_neutralize(rank(-1 * (vwap - close)), subindustry)",
-    "group_neutralize(rank(-1 * ts_delta(vwap, 5)), subindustry)",
-    "group_neutralize(rank(close / (vwap + 0.001) - 1), subindustry)",
-    "group_neutralize(rank(-1 * ts_corr(vwap, volume, 10)), subindustry)",
+    "group_neutralize(rank(-1 * ts_delta(vwap, 3)), subindustry)",
     "group_neutralize(rank(ts_rank(vwap, 20)), subindustry)",
 
-    # === TIER 5: FUNDAMENTALS COMBINED WITH PRICE ===
-    "group_neutralize(rank(ts_zscore(fnd6_roa, 252)), subindustry)",
-    "group_neutralize(rank(ts_zscore(fnd6_ebitda, 252)), subindustry)",
-    "group_neutralize(rank(-1 * ts_delta(fnd6_roa, 63)), subindustry)",
-    "group_neutralize(rank(fnd6_roa - ts_mean(fnd6_roa, 252)), subindustry)",
-    "group_neutralize(rank(ts_zscore(fnd6_grossmargin, 252)), subindustry)",
-    "group_neutralize(rank(fnd6_ebitda / (enterprise_value + 0.001)), subindustry)",
-
-    # === TIER 6: MULTI-FACTOR COMPOSITES ===
+    # === TIER 5: MULTI-FACTOR COMPOSITES (HIGH RETURNS TARGETING) ===
     "group_neutralize(rank(-1 * ts_delta(close, 5) * log(volume + 1)), subindustry)",
-    "group_neutralize(rank(-1 * ts_delta(close, 5) + ts_zscore(volume, 20)), subindustry)",
     "group_neutralize(rank((-1 * ts_delta(close, 5)) / (ts_std_dev(close, 20) + 0.001)), subindustry)",
     "group_neutralize(rank(ts_rank(-1 * ts_delta(close, 5), 20) + ts_rank(volume, 10)), subindustry)",
     "group_neutralize(rank((-1 * ts_delta(close, 3)) / (vwap + 0.001)), subindustry)",
@@ -151,7 +146,7 @@ ALPHA_LIBRARY = [
     "group_neutralize(rank(signed_power(ts_zscore(close, 20), 0.5)), subindustry)",
     "group_neutralize(rank(-1 * signed_power(ts_delta(close, 5), 0.7)), subindustry)",
 
-    # === TIER 7: CROSS-SECTIONAL RANK COMBINATIONS ===
+    # === TIER 6: CROSS-SECTIONAL RANK COMBINATIONS ===
     "rank(-1 * ts_delta(close, 5))",
     "rank(-1 * ts_rank(close, 20))",
     "rank(log(volume) - log(ts_mean(volume, 20)))",
@@ -168,11 +163,8 @@ ALPHA_LIBRARY = [
     "rank(ts_mean(high - low, 5) / (ts_mean(close, 5) + 0.001))",
     "rank(-1 * ts_decay_linear(ts_delta(close, 3), 10))",
     "rank(ts_corr(ts_rank(close, 5), ts_rank(volume, 5), 10))",
-    "rank(ts_zscore(fnd6_roa, 252))",
-    "rank(fnd6_roa - ts_mean(fnd6_roa, 252))",
-    "rank(ts_zscore(fnd6_grossmargin, 252))",
 
-    # === TIER 8: RETURNS-BASED ===
+    # === TIER 7: RETURNS-BASED ===
     "group_neutralize(rank(-1 * returns), subindustry)",
     "group_neutralize(rank(ts_mean(returns, 5)), subindustry)",
     "group_neutralize(rank(-1 * ts_mean(returns, 20)), subindustry)",
@@ -181,6 +173,14 @@ ALPHA_LIBRARY = [
     "group_neutralize(rank(ts_rank(returns, 252)), subindustry)",
     "group_neutralize(rank(ts_rank(-1 * ts_mean(returns, 5), 20)), subindustry)",
     "group_neutralize(rank(returns - ts_mean(returns, 20)), subindustry)",
+
+    # === TIER 8: DECAY + MOMENTUM FUSION (HIGH FITNESS TARGETING) ===
+    "group_neutralize(rank(ts_decay_linear(rank(-1 * ts_delta(close, 1)), 5)), subindustry)",
+    "group_neutralize(rank(ts_decay_linear(rank(-1 * ts_corr(close, volume, 5)), 10)), subindustry)",
+    "group_neutralize(rank(-1 * ts_decay_linear(rank(ts_zscore(close, 20)), 20)), subindustry)",
+    "group_neutralize(signed_power(rank(-1 * ts_delta(close, 5)), 1.5), subindustry)",
+    "group_neutralize(signed_power(rank(-1 * ts_corr(close, volume, 10)), 1.5), subindustry)",
+    "group_neutralize(rank(-1 * ts_mean(ts_delta(close, 1), 5) / (ts_std_dev(close, 20) + 0.0001)), subindustry)",
 ]
 
 
