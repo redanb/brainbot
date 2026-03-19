@@ -2,12 +2,15 @@ name: WorldQuant Brain Alpha Factory 24/7
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Run once daily at UTC midnight
+    - cron: '0 */6 * * *' # Run every 6 hours
   workflow_dispatch: # Allow manual trigger
 
 jobs:
   hypothesize_alpha:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        worker_id: [1, 2, 3, 4, 5]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

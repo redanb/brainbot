@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+.env
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+audit_log.jsonl
+evolution_log.json
+llm_router_telemetry.jsonl
+brainbot_metrics.json
+temp_verify/

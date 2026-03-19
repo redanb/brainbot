@@ -1,0 +1,56 @@
+name: 🧠 Trinity Pulse — WorldQuant Hyperscaling (Phase 3)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */4 * * *' # Every 4 hours
+
+jobs:
+  trinity-batch:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    
+    env:
+      BRAIN_EMAIL: ${{ secrets.BRAIN_EMAIL }}
+      BRAIN_PASSWORD: ${{ secrets.BRAIN_PASSWORD }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
+      CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      ANTIGRAVITY_AUTO_TRIGGER: "true"
+      MAX_API_CALLS: "100"
+      ANTIGRAVITY_MASTER_DIR: "/home/runner/work/brainbot/brainbot/.antigravity/master"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests google-genai openai groq anthropic pandas numpy xgboost lightgbm scikit-learn numerapi
+
+      - name: "🛡️ Pre-Flight Health Check"
+        run: |
+          mkdir -p $ANTIGRAVITY_MASTER_DIR
+          python health_check.py
+
+      - name: "🧠 Run Trinity Pulse Alpha Factory"
+        run: |
+          echo "=== BATCH ${{ matrix.batch }} START ==="
+          python alpha_factory.py
+          echo "=== BATCH ${{ matrix.batch }} COMPLETE ==="
+        continue-on-error: true

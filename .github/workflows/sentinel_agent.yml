@@ -1,0 +1,36 @@
+name: 🛡️ Sentinel Agent — Self-Healing & Alerts
+
+on:
+  workflow_run:
+    workflows: ["🧠 Trinity Pulse — WorldQuant Hyperscaling (Phase 3)"]
+    types:
+      - completed
+
+jobs:
+  sentinel-report:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion != 'skipped' }}
+    
+    env:
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      ANTIGRAVITY_MASTER_DIR: "/home/runner/work/brainbot/brainbot/.antigravity/master"
+      WORKFLOW_STATUS: ${{ github.event.workflow_run.status }}
+      WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: pip install requests
+
+      - name: "🛡️ Execute Sentinel Audit"
+        run: |
+          # Try to download the master directory artifact if we want to carry state
+          # For now, we just report the current run conclusion
+          python sentinel_agent.py
