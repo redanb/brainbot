@@ -28,7 +28,7 @@ def test_audit_integrity():
     assert data['brain']['successful_submissions'] > 0, "Success count did not increment!"
     
     # 3. History Check
-    last_log = data['brain']['history'][-1]
+    last_log = data['brain']['history'][0]
     assert "Regression Audit Tool" in last_log['details'], "History entry missing details!"
     
     print("Regression Audit PASSED.")

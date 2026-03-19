@@ -16,6 +16,12 @@ CONFIRMED DATA FIELDS (from working alpha VkEqdPpJ):
 """
 from pathlib import Path
 from datetime import datetime
+import os
+import sys
+import logging
+import json
+import requests
+import time
 
 def get_master_dir():
     if "ANTIGRAVITY_MASTER_DIR" in os.environ:
