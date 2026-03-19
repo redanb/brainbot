@@ -3,7 +3,7 @@ name: 🧠 Trinity Pulse — WorldQuant Hyperscaling (Phase 3)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *' # Every 4 hours
+    - cron: '0 * * * *'  # Every hour, 24/7
 
 jobs:
   trinity-batch:
@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         batch: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    
+
     env:
       BRAIN_EMAIL: ${{ secrets.BRAIN_EMAIL }}
       BRAIN_PASSWORD: ${{ secrets.BRAIN_PASSWORD }}
@@ -26,14 +26,14 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       ANTIGRAVITY_AUTO_TRIGGER: "true"
-      MAX_API_CALLS: "100"
+      MAX_API_CALLS: "80"
       ANTIGRAVITY_MASTER_DIR: "/home/runner/work/brainbot/brainbot/.antigravity/master"
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -41,16 +41,18 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests google-genai openai groq anthropic pandas numpy xgboost lightgbm scikit-learn numerapi
+          pip install requests google-genai openai groq anthropic pandas numpy \
+            xgboost lightgbm scikit-learn numerapi mistralai
 
-      - name: "🛡️ Pre-Flight Health Check"
-        run: |
-          mkdir -p $ANTIGRAVITY_MASTER_DIR
-          python health_check.py
+      - name: Create Master Directory
+        run: mkdir -p $ANTIGRAVITY_MASTER_DIR
 
-      - name: "🧠 Run Trinity Pulse Alpha Factory"
+      - name: Pre-Flight Health Check
+        run: python health_check.py
+
+      - name: Run Trinity Pulse Alpha Factory
         run: |
-          echo "=== BATCH ${{ matrix.batch }} START ==="
+          echo "=== BATCH ${{ matrix.batch }} STARTING ==="
           python alpha_factory.py
           echo "=== BATCH ${{ matrix.batch }} COMPLETE ==="
         continue-on-error: true
