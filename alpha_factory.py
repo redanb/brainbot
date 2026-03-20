@@ -19,6 +19,7 @@ import json
 import logging
 import threading
 import requests
+import env_discovery
 import concurrent.futures
 from pathlib import Path
 from datetime import datetime
@@ -46,15 +47,12 @@ def get_master_dir() -> Path:
     return Path.home() / ".antigravity" / "master"
 
 def load_env():
-    """Load .env from master dir if present."""
-    env_path = get_master_dir() / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
-        log.info("Loaded .env from master dir.")
+    """Load environment using multi-tier discovery."""
+    files = env_discovery.initialize_environment()
+    if files:
+        log.info(f"Loaded environments from: {', '.join(files)}")
+    else:
+        log.warning("No .env files found. Relying on OS environment variables.")
 
 # ─── EVOLUTION TRACKER ────────────────────────────────────────────────────────
 try:

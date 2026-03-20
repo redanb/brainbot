@@ -6,15 +6,30 @@ Exits 0 if all conditions are met, 1 otherwise.
 import os
 import sys
 import requests
+import env_discovery
 from pathlib import Path
 
 def check_env():
+    """Validate environment secrets."""
+    print("Checking environment secrets...")
+    # Load all possible .env files
+    env_discovery.initialize_environment()
+    
     required = ["BRAIN_EMAIL", "BRAIN_PASSWORD"]
-    missing = [r for r in required if not os.getenv(r)]
-    if missing:
-        print(f"[FAIL] Missing required ENV vars: {', '.join(missing)}")
+    optional = ["GEMINI_API_KEY", "OPEN_ROUTER_KEY", "PERPLEXITY_API_KEY", "TELEGRAM_TOKEN", "GITHUB_TOKEN"]
+    
+    missing_req = [k for k in required if not os.getenv(k)]
+    missing_opt = [k for k in optional if not os.getenv(k)]
+
+    if missing_req:
+        print(f"[FAIL] Missing required ENV vars: {', '.join(missing_req)}")
         return False
     print("[PASS] Essential ENV vars present.")
+
+    if missing_opt:
+        print(f"[WARN] Missing optional ENV vars: {', '.join(missing_opt)}")
+    else:
+        print("[PASS] All optional ENV vars present.")
     return True
 
 def check_master_dir():

@@ -23,6 +23,7 @@ import sys
 import json
 import time
 import logging
+import env_discovery
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -62,20 +63,10 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 # ── Manual .env Loader ───────────────────────────────
 def _load_env_manually():
-    """Load .env file if it exists (Master directory)."""
-    env_path = MASTER_DIR / ".env"
-    if env_path.exists():
-        try:
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    if "=" in line:
-                        k, v = line.split("=", 1)
-                        os.environ[k.strip()] = v.strip()
-        except Exception:
-            pass
+    """Load environment using multi-tier discovery."""
+    files = env_discovery.initialize_environment()
+    if files:
+        print(f"LLMRouter: Loaded environment from {', '.join(files)}")
 
 _load_env_manually()
 
@@ -591,8 +582,10 @@ def _local_template(system_prompt: str, user_query: str, **kwargs) -> dict:
     """
     _log_telemetry("local_template", "FALLBACK", 0, 0, "No API keys available")
     logger.warning("FALLBACK: Using local template - no LLM API available")
+    safe_prompt = str(system_prompt)[:100] if system_prompt else "N/A"
+    safe_query = str(user_query)[:100] if user_query else "N/A"
     return {
-        "text": f"[LOCAL TEMPLATE] System Role: {system_prompt[:100]}... Query: {user_query}",
+        "text": f"[LOCAL TEMPLATE] System Role: {safe_prompt}... Query: {safe_query}",
         "tokens": 0, "provider": "local_template", "model": "none", "latency_ms": 0,
     }
 
@@ -637,36 +630,42 @@ def route_query(system_prompt: str, user_query: str, depth: str = "STANDARD",
         "FAST": "models/gemini-2.5-flash",
         "STANDARD": "models/gemini-2.5-flash",
         "DEEP": "models/gemini-2.5-pro",
+        "REASONING": "models/gemini-2.5-flash", # Gemini flash is fast enough for basic reasoning
     }
 
     groq_model_map = {
         "FAST": "llama-3.1-8b-instant",
         "STANDARD": "llama-3.3-70b-versatile",
         "DEEP": "llama-3.3-70b-versatile",
+        "REASONING": "deepseek-r1-distill-llama-70b",
     }
 
     claude_model_map = {
         "FAST": "claude-3-5-haiku-20241022",
         "STANDARD": "claude-3-5-sonnet-20241022",
         "DEEP": "claude-3-5-sonnet-20241022",
+        "REASONING": "claude-3-7-sonnet-20250219", # Claude 3.7 has reasoning capability
     }
 
     perplexity_model_map = {
         "FAST": "sonar",
         "STANDARD": "sonar",
         "DEEP": "sonar-reasoning",
+        "REASONING": "sonar-reasoning",
     }
 
     github_model_map = {
         "FAST": "gpt-4o-mini",
         "STANDARD": "gpt-4o",
         "DEEP": "o1-preview",
+        "REASONING": "o1-mini",
     }
 
     openrouter_model_map = {
-        "FAST": "meta-llama/llama-3.1-8b-instruct:free",
+        "FAST": "xiaomi/mimo-v2-flash:free",
         "STANDARD": "qwen/qwen-2.5-72b-instruct",
-        "DEEP": "deepseek/deepseek-r1",
+        "DEEP": "xiaomi/mimo-v2-pro",
+        "REASONING": "deepseek/deepseek-r1",
     }
 
     # Build provider chain (respect preferred_provider if set)
@@ -706,7 +705,7 @@ def route_query(system_prompt: str, user_query: str, depth: str = "STANDARD",
                         except Exception as ge:
                             if "429" in str(ge) or "QUOTA" in str(ge).upper() or "EXHAUSTED" in str(ge).upper():
                                 # type: ignore
-                                log_key = str(key)[-4:] if key else "????"
+                                log_key = str(key)[-4:] if (key and len(str(key)) >= 4) else "????"
                                 logger.warning(f"Gemini Key ...{log_key} exhausted. Rotating to next key...")
                                 continue
                             raise ge
@@ -729,7 +728,7 @@ def route_query(system_prompt: str, user_query: str, depth: str = "STANDARD",
                             return res
                         except Exception as ce:
                             if "429" in str(ce) or "400" in str(ce) or "QUOTA" in str(ce).upper():
-                                log_key = str(key)[-4:] if key else "????"
+                                log_key = str(key)[-4:] if (key and len(str(key)) >= 4) else "????"
                                 logger.warning(f"Claude Key ...{log_key} exhausted/errored. Rotating...")
                                 continue
                             raise ce
@@ -852,7 +851,8 @@ if __name__ == "__main__":
 
     if len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])
-        print(f"\nTest routing: {query[:60]}...")
+        safe_query = query[:60] if query else "N/A"
+        print(f"\nTest routing: {safe_query}...")
         result = route_query(
             system_prompt="You are a helpful AI assistant specializing in AI governance.",
             user_query=query,
