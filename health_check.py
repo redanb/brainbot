@@ -9,7 +9,7 @@ import requests
 from pathlib import Path
 
 def check_env():
-    required = ["BRAIN_EMAIL", "BRAIN_PASSWORD", "GEMINI_API_KEY"]
+    required = ["BRAIN_EMAIL", "BRAIN_PASSWORD"]
     missing = [r for r in required if not os.getenv(r)]
     if missing:
         print(f"[FAIL] Missing required ENV vars: {', '.join(missing)}")

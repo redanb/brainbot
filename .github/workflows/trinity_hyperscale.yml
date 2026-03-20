@@ -55,4 +55,11 @@ jobs:
           echo "=== BATCH ${{ matrix.batch }} STARTING ==="
           python alpha_factory.py
           echo "=== BATCH ${{ matrix.batch }} COMPLETE ==="
-        continue-on-error: true
+
+      - name: Sentinel Agent Reporting
+        if: always()
+        env:
+          WORKFLOW_STATUS: ${{ job.status }}
+          WORKFLOW_CONCLUSION: ${{ job.status }}
+        run: python sentinel_agent.py
+
