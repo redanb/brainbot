@@ -1,0 +1,43 @@
+name: 🤖 Cloud Agent Healer (Continuous Feedback)
+on:
+  workflow_run:
+    workflows: ["🧠 Trinity Pulse — WorldQuant Hyperscaling (Phase 3)"]
+    types:
+      - completed
+
+permissions:
+  contents: write  # Crucial: Allows the agent to push code patches back to the repo
+  actions: read
+
+jobs:
+  auto-heal:
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Install Dependencies
+        run: |
+          pip install requests google-genai openai groq anthropic mistralai
+        
+      - name: Execute Autonomous Fixer (OpenClaw Capability)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPEN_ROUTER_KEY: ${{ secrets.OPEN_ROUTER_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Set git config for the agent's autonomous commits
+          git config --global user.name "Trinity Cloud Healer"
+          git config --global user.email "healer@antigravity.ai"
+          
+          # Trigger the python auto-fixer script globally
+          python auto_fixer.py
