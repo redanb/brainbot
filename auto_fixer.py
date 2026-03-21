@@ -11,7 +11,11 @@ import subprocess
 # Local imports
 sys.path.append(str(Path.cwd()))
 import env_discovery
-from llm_router import route_query
+try:
+    from llm_router import route_query
+except (ImportError, NameError, SyntaxError) as e:
+    print(f"CRITICAL: Failed to import llm_router: {e}. Using fallback MinimalRouter.")
+    route_query = None # Defined later in fallback logic if needed
 
 log = logging.getLogger("AutoFixer")
 
@@ -87,6 +91,11 @@ class ContinuousFeedbackFixer:
         """Uses LLM to analyze the failure and generate a patch."""
         log.info("Analyzing failure via AI Router...")
         
+        global route_query
+        if route_query is None:
+            log.warning("Primary route_query failed. Attempting Minimal Gemini Fallback...")
+            route_query = self._minimal_gemini_fallback
+        
         system_prompt = """You are an elite DevOps Autonomous Agent. 
 Your goal is to analyze CI/CD pipeline failures and provide a DIRECT python script 
 that fixes the issue.
@@ -152,6 +161,32 @@ Assume the script runs in the repository root.
         else:
             log.error("AI failed to generate a valid python fix script.")
             log.debug(f"AI Output: {text}")
+
+    def _minimal_gemini_fallback(self, system_prompt, user_prompt, **kwargs):
+        """Emergency direct API call using requests (no llm_router dependency)."""
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            return {"text": "ERROR: Minimal fallback failed - No GEMINI_API_KEY"}
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{
+                "parts": [{"text": f"{system_prompt}\n\nUSER REQUEST: {user_prompt}"}]
+            }],
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 4096
+            }
+        }
+        try:
+            resp = requests.post(url, json=payload, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            text = data['candidates'][0]['content']['parts'][0]['text']
+            return {"text": text, "provider": "minimal_gemini"}
+        except Exception as e:
+            log.error(f"Minimal fallback failed: {e}")
+            return {"text": f"ERROR: {e}"}
 
     def run_cycle(self):
         log.info("Checking for new pipeline failures...")

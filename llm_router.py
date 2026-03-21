@@ -23,6 +23,7 @@ import sys
 import json
 import time
 import logging
+from typing import TypedDict, Annotated, List, Dict, Any, Optional
 import env_discovery
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -129,7 +130,7 @@ def _log_telemetry(provider: str, status: str, latency_ms: int, tokens: int = 0,
 
 
 # ============================================================
-from typing import TypedDict, Annotated, List, Dict, Any, Optional
+# ============================================================
 
 def _call_gemini(system_prompt: str, user_query: str, model: str = "gemini-2.0-flash", **kwargs) -> dict:
     """
