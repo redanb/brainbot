@@ -59,13 +59,13 @@ def log_brain_submission(alpha_id: str, expression: str, sharpe: float,
     entry = {
         "timestamp": datetime.now().isoformat(),
         "date": datetime.now().strftime("%Y-%m-%d %H:%M IST"),
-        "alpha_id": alpha_id,
-        "expression": expression[:1024],
-        "sharpe": round(sharpe, 4),
-        "fitness": round(fitness, 4),
-        "turnover": round(turnover, 4),
-        "returns": round(returns, 4),
-        "margin": round(margin, 4),
+        "alpha_id": str(alpha_id),
+        "expression": str(expression)[:1024],
+        "sharpe": round(float(sharpe), 4),
+        "fitness": round(float(fitness), 4),
+        "turnover": round(float(turnover), 4),
+        "returns": round(float(returns), 4),
+        "margin": round(float(margin), 4),
         "regime": regime,
         "status": status,
         "reason": reason
@@ -195,36 +195,19 @@ def audit_alpha_decay(alpha_id: str) -> float:
     return round(decay, 4) if decay > 0 else 0.0
 
 def notify_submission(alpha_id: str, expression: str, sharpe: float, fitness: float):
-    """Send a real-time notification via Telegram."""
-    token_path = get_master_dir() / "automated_skills" / ".telegram_token"
-    if not token_path.exists():
-        return
-    
+    """Send a real-time notification via Sentinel Agent."""
     try:
-        token = token_path.read_text().strip().split("\n")[0].strip()
-        chat_id = "985485272" # OWNER_CHAT_ID from remote_control
-        
+        from sentinel_agent import send_telegram
         msg = (
             f"🚀 **New Alpha Submitted**\n\n"
             f"🆔 ID: `{alpha_id}`\n"
-            f"📊 Sharpe: `{sharpe:.4f}`\n"
-            f"📈 Fitness: `{fitness:.4f}`\n"
-            f"📝 Expr: `{expression[:100]}...`"
+            f"📊 Sharpe: `{float(sharpe):.4f}`\n"
+            f"📈 Fitness: `{float(fitness):.4f}`\n"
+            f"📝 Expr: `{str(expression)[:100]}...`"
         )
-        
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        params = {
-            "chat_id": chat_id,
-            "text": msg,
-            "parse_mode": "Markdown"
-        }
-        
-        data = urllib.parse.urlencode(params).encode("utf-8")
-        req = urllib.request.Request(url, data=data)
-        with urllib.request.urlopen(req) as response:
-            pass
+        send_telegram(msg)
     except Exception:
-        pass # Silent failure for notifications to avoid breaking the core loop
+        pass # Silent failure to avoid breaking the core loop
 
 if __name__ == "__main__":
 

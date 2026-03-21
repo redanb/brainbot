@@ -9,14 +9,25 @@ import requests
 import json
 from pathlib import Path
 
+# Local imports
+sys.path.append(str(Path.cwd()))
+import env_discovery
+
 def get_master_dir():
+    """Finds the master directory using prioritized path resolution."""
     if "ANTIGRAVITY_MASTER_DIR" in os.environ:
         return Path(os.environ["ANTIGRAVITY_MASTER_DIR"])
+    if os.name == "nt":
+        return Path(r"C:\Users\admin\.antigravity\master")
     return Path.home() / ".antigravity" / "master"
 
 def send_telegram(message):
+    """Sends a Telegram message using centralized environment discovery."""
+    env_discovery.initialize_environment()
     token = os.getenv("TELEGRAM_TOKEN")
-    chat_id = "985485272" # Verified User Chat ID
+    # Priority: Env Var > Hardcoded verified ID
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "985485272")
+    
     if not token:
         print("TELEGRAM_TOKEN not found. Skipping notification.")
         return
@@ -28,9 +39,13 @@ def send_telegram(message):
             "text": message,
             "parse_mode": "Markdown"
         }
-        resp = requests.post(url, json=payload, timeout=10)
+        resp = requests.post(url, json=payload, timeout=15)
         if resp.status_code == 200:
-            print("Telegram notification sent.")
+            print(f"Telegram notification sent to {chat_id}.")
+        elif resp.status_code == 401:
+            print("Telegram failed: Unauthorized (Invalid Token).")
+        elif resp.status_code == 400:
+            print(f"Telegram failed: Bad Request (Check Chat ID {chat_id}).")
         else:
             print(f"Telegram failed: {resp.status_code} {resp.text}")
     except Exception as e:

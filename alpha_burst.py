@@ -225,15 +225,11 @@ class AuditHelper:
 audit_helper = AuditHelper()
 
 
+import env_discovery
+
 def load_env():
-    env_path = MASTER_DIR / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if "=" in line and not line.startswith("#"):
-                k, v = line.split("=", 1)
-                v = v.strip().strip('"').strip("'")
-                os.environ.setdefault(k.strip(), v)
+    """Unified environment discovery."""
+    env_discovery.initialize_environment()
 
 
 def log_to_tracker(alpha_id, expr, sharpe, fitness, turnover, status):

@@ -123,11 +123,26 @@ Assume the script runs in the repository root.
                 subprocess.run([sys.executable, "emergency_fix.py"], check=True)
                 log.info("Fix applied successfully. Committing and pushing...")
                 
-                # Commit and push
+                # Check for changes before committing
+                status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout.strip()
+                if not status:
+                    log.info("No changes to commit. Healer generated a redudant fix.")
+                    return
+
+                # Commit with --allow-empty just in case, or catch 1
                 subprocess.run(["git", "add", "."], check=True)
-                subprocess.run(["git", "commit", "-m", f"Auto-Fix: Corrected pipeline failure {run_data['id']}"], check=True)
-                subprocess.run(["git", "push"], check=True)
-                log.info("Self-healing sequence complete.")
+                subprocess.run(["git", "commit", "-m", f"Auto-Fix: Corrected pipeline failure {run_data['id']}"], check=False)
+                
+                # Push with retry
+                for push_attempt in range(3):
+                    try:
+                        subprocess.run(["git", "push"], check=True)
+                        log.info("Self-healing sequence complete.")
+                        break
+                    except subprocess.CalledProcessError:
+                        log.warning(f"Push attempt {push_attempt+1} failed. Retrying...")
+                        subprocess.run(["git", "pull", "--rebase"], check=False)
+                        time.sleep(5)
                 
             except subprocess.CalledProcessError as e:
                 log.error(f"Failed to apply or push fix: {e}")

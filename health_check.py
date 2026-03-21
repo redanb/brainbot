@@ -50,6 +50,7 @@ def check_master_dir():
         return False
 
 def check_worldquant_auth():
+    """Validate WorldQuant API credentials."""
     email = os.getenv("BRAIN_EMAIL")
     password = os.getenv("BRAIN_PASSWORD")
     url = "https://api.worldquantbrain.com/authentication"
@@ -65,12 +66,36 @@ def check_worldquant_auth():
         print(f"[FAIL] Connectivity error: {e}")
         return False
 
+def check_telegram():
+    """Validate Telegram connectivity."""
+    print("Checking Telegram connectivity...")
+    token = os.getenv("TELEGRAM_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "985485272")
+    
+    if not token:
+        print("[WARN] TELEGRAM_TOKEN not found. Alerts will be skipped.")
+        return True # Optional, don't fail health check
+    
+    url = f"https://api.telegram.org/bot{token}/getMe"
+    try:
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            print(f"[PASS] Telegram Bot API reachable. Chat ID: {chat_id}")
+            return True
+        else:
+            print(f"[WARN] Telegram Bot API returned {resp.status_code}. Alerts may fail.")
+            return True # Optional
+    except Exception as e:
+        print(f"[WARN] Telegram connectivity error: {e}")
+        return True # Optional
+
 if __name__ == "__main__":
     print("--- TRINITY PULSE PRE-FLIGHT HEALTH CHECK ---")
     results = [
         check_env(),
         check_master_dir(),
-        check_worldquant_auth()
+        check_worldquant_auth(),
+        check_telegram()
     ]
     if all(results):
         print("--- ALL CHECKS PASSED. PROCEEDING TO FACTORY ---")
