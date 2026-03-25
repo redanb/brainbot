@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '0 * * * *'  # Every hour, 24/7
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   trinity-batch:
     runs-on: ubuntu-latest

@@ -33,9 +33,10 @@ def check_env():
     return True
 
 def check_master_dir():
+    env_discovery.initialize_environment()
     master_dir = os.getenv("ANTIGRAVITY_MASTER_DIR")
     if not master_dir:
-        print("[FAIL] ANTIGRAVITY_MASTER_DIR not set.")
+        print("[FAIL] ANTIGRAVITY_MASTER_DIR not set (even after discovery).")
         return False
     path = Path(master_dir)
     try:

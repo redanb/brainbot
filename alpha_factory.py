@@ -25,10 +25,14 @@ from pathlib import Path
 from datetime import datetime
 
 # ─── ENCODING FIX (RULE-086) ──────────────────────────────────────────────────
-try:
-    sys.stdout.reconfigure(encoding="utf-8")
-except Exception:
-    pass
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        # Cast to Any to satisfy linter with hasattr check
+        from typing import Any
+        reconfig: Any = sys.stdout.reconfigure
+        reconfig(encoding="utf-8")
+    except Exception:
+        pass
 
 # ─── LOGGING ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -49,10 +53,12 @@ def get_master_dir() -> Path:
 def load_env():
     """Load environment using multi-tier discovery."""
     files = env_discovery.initialize_environment()
-    if files:
-        log.info(f"Loaded environments from: {', '.join(files)}")
+    if files and isinstance(files, list):
+        log.info(f"Loaded environments from: {', '.join(map(str, files))}")
     else:
         log.warning("No .env files found. Relying on OS environment variables.")
+    if not os.getenv("BRAIN_EMAIL"):
+        log.error("CRITICAL: BRAIN_EMAIL is still empty after env_discovery.")
 
 # ─── EVOLUTION TRACKER ────────────────────────────────────────────────────────
 try:

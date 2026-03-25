@@ -1,54 +1,66 @@
-import sys
 import os
-import subprocess
+import sys
 from pathlib import Path
 
 PASS = "[PASS]"
 FAIL = "[FAIL]"
 
-def check(label, condition, error_msg=""):
+def check(label, condition, msg=""):
     if condition:
         print(f"{PASS} {label}")
+        return True
     else:
-        print(f"{FAIL} {label}: {error_msg}")
-        sys.exit(1)
+        print(f"{FAIL} {label} - {msg}")
+        return False
 
-def main():
-    print("--- Starting Verification for task: Fixing llm_router.py and Enhancing Auto-Heal ---")
+def run_regression_audit():
+    print("\n--- REGRESSION AUDIT ---")
+    all_passed = True
     
-    # 1. Syntax Check
-    res = subprocess.run([sys.executable, "-m", "py_compile", "llm_router.py"], capture_output=True)
-    check("llm_router.py syntax is valid", res.returncode == 0, res.stderr.decode())
-
-    # 2. Import and Basic Functionality
+    # 1. Existing functionality check: alpha_factory can be imported
     try:
-        from llm_router import _safety_gate, MASTER_DIR
-        check("llm_router.py is importable", True)
-        res = _safety_gate("Test prompt", "Safe query")
-        check("_safety_gate is callable and works", res is None)
-        check("MASTER_DIR is correctly resolved", MASTER_DIR is not None)
+        import alpha_factory
+        all_passed &= check("alpha_factory.py imports successfully", True)
     except Exception as e:
-        check("llm_router.py is importable", False, str(e))
-
-    # 3. Auto-Fixer Resilience Check
-    # We check if it can import with a 'broken' router (simulated)
-    # But first, check if it imports normally
+        all_passed &= check("alpha_factory.py imports successfully", False, str(e))
+        
+    # 2. Existing functionality check: health_check can be imported
     try:
-        from auto_fixer import ContinuousFeedbackFixer
-        check("auto_fixer.py is importable", True)
-        fixer = ContinuousFeedbackFixer()
-        check("ContinuousFeedbackFixer initializes", fixer is not None)
+        import health_check
+        all_passed &= check("health_check.py imports successfully", True)
     except Exception as e:
-        check("auto_fixer.py is importable", False, str(e))
+        all_passed &= check("health_check.py imports successfully", False, str(e))
+        
+    return all_passed
 
-    # 4. Regression Audit: check other core files still import correctly
-    core_files = ["alpha_burst.py", "evolution_tracker.py", "alpha_mutator.py"]
-    for f in core_files:
-        if Path(f).exists():
-            res = subprocess.run([sys.executable, "-m", "py_compile", f], capture_output=True)
-            check(f"{f} syntax remains valid", res.returncode == 0, res.stderr.decode())
-
-    print("\n[CONFIDENCE: High] All checks passed. The 'Circular Dependency' in healer-router is resolved.")
+def run_feature_checks():
+    print("\n--- NEW FEATURE CHECKS ---")
+    all_passed = True
+    
+    # Node 24 Env check in YML
+    yml_path = Path(".github/workflows/trinity_hyperscale.yml")
+    if yml_path.exists():
+        content = yml_path.read_text()
+        has_env = "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: \"true\"" in content
+        all_passed &= check("GHA Workflow has Node 24 override", has_env, "Missing FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 in env")
+    else:
+        all_passed &= check("GHA Workflow exists", False, "File not found")
+        
+    return all_passed
 
 if __name__ == "__main__":
-    main()
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except:
+            pass
+            
+    r_pass = run_regression_audit()
+    f_pass = run_feature_checks()
+    
+    if r_pass and f_pass:
+        print("\n[ALL CHECKS PASSED] Readiness Verified")
+        sys.exit(0)
+    else:
+        print("\n[CHECKS FAILED] See details above")
+        sys.exit(1)
