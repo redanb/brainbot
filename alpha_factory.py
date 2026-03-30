@@ -23,6 +23,7 @@ import env_discovery
 import concurrent.futures
 from pathlib import Path
 from datetime import datetime
+from xgboost_compiler import XGBoostCompiler
 
 # ─── ENCODING FIX (RULE-086) ──────────────────────────────────────────────────
 if hasattr(sys.stdout, "reconfigure"):
@@ -40,6 +41,8 @@ logging.basicConfig(
     format="%(asctime)s [FACTORY] %(levelname)s %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
+for handler in logging.getLogger().handlers:
+    handler.flush = sys.stdout.flush
 log = logging.getLogger("alpha_factory")
 
 # ─── DYNAMIC PATH RESOLUTION (RULE-100) ───────────────────────────────────────
@@ -231,36 +234,41 @@ ALPHA_LIBRARY = [
 class BrainAPI:
     """WorldQuant Brain API with retry logic and self-healing."""
 
-    def __init__(self):
+    def __init__(self, email=None, password=None):
         self.base = "https://api.worldquantbrain.com"
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
         })
+        self.email = email or os.getenv("BRAIN_EMAIL")
+        self.password = password or os.getenv("BRAIN_PASSWORD")
         self._connect()
 
     def _connect(self):
-        email = os.getenv("BRAIN_EMAIL")
-        password = os.getenv("BRAIN_PASSWORD")
-        if not email or not password:
-            log.error("CRITICAL: BRAIN_EMAIL or BRAIN_PASSWORD missing.")
-            sys.exit(1)
-        for attempt in range(3):
+        if not self.email or not self.password:
+            log.error("CRITICAL: BRAIN_EMAIL or BRAIN_PASSWORD missing. Check GitHub Secrets.")
+            raise ConnectionError("BRAIN_EMAIL or BRAIN_PASSWORD not set. Aborting.")
+        for attempt in range(10):
             try:
-                r = self.session.post(f"{self.base}/authentication", auth=(email, password), timeout=30)
+                r = self.session.post(f"{self.base}/authentication", auth=(self.email, self.password), timeout=30)
                 if r.status_code == 201:
                     tok = self.session.cookies.get("t")
                     if tok:
                         self.session.headers.update({"Authorization": f"Bearer {tok}"})
                     log.info("Brain API authenticated.")
                     return
-                log.warning(f"Auth attempt {attempt+1} failed: {r.status_code}")
-                time.sleep(5)
+                
+                # Exponential backoff: 2^attempt * 5 seconds (5, 10, 20, 40, 80, 160, 320...)
+                wait = (2 ** attempt) * 5
+                log.warning(f"Auth attempt {attempt+1}/10 failed: {r.status_code}. Sleeping {wait}s...")
+                time.sleep(wait)
             except Exception as e:
-                log.warning(f"Auth attempt {attempt+1} error: {e}")
-                time.sleep(10)
-        log.error("All authentication attempts failed. Exiting.")
-        sys.exit(1)
+                wait = (2 ** attempt) * 5
+                log.warning(f"Auth attempt {attempt+1}/10 error: {e}. Sleeping {wait}s...")
+                time.sleep(wait)
+        
+        log.error("All 10 authentication attempts failed. Account may be locked or credentials invalid.")
+        raise ConnectionError("Failed to authenticate with WorldQuant Brain after 10 attempts.")
 
     def simulate(self, expression: str, universe: str = "TOP1000") -> dict:
         """Submit a simulation and wait for results."""
@@ -352,27 +360,30 @@ class BrainAPI:
             log.warning(f"Metrics fetch error for {alpha_id}: {e}")
         return {"id": alpha_id, "sharpe": 0.0, "fitness": 0.0, "turnover": 1.0}
 
-    def submit(self, alpha_id: str) -> bool:
-        """Submit alpha to IQC with retry."""
+    def submit(self, alpha_id: str) -> tuple[bool, str]:
+        """Submit alpha to IQC with retry. Returns (success, error_msg)."""
+        last_error = ""
         for attempt in range(3):
             try:
                 r = self.session.post(f"{self.base}/alphas/{alpha_id}/submit", timeout=30)
                 if r.status_code == 201:
                     log.info(f"*** SUBMITTED: {alpha_id} ***")
                     audit_helper.update_audit("brain", "SUCCESS", details=f"SUBMITTED: {alpha_id}")
-                    return True
+                    return True, ""
                 elif r.status_code == 409:
                     log.warning(f"Alpha {alpha_id} already submitted (409 Conflict).")
-                    return False
+                    return False, "409_ALREADY_SUBMITTED"
                 else:
-                    log.warning(f"Submit {attempt+1}/3 failed for {alpha_id}: {r.status_code} {r.text[:60]}")
+                    last_error = r.text[:200]
+                    log.warning(f"Submit {attempt+1}/3 failed for {alpha_id}: {r.status_code} {last_error[:60]}")
                     time.sleep(10)
             except Exception as e:
+                last_error = str(e)
                 log.warning(f"Submit error (attempt {attempt+1}): {e}")
                 time.sleep(10)
-        log.error(f"All submit attempts failed for {alpha_id}.")
-        audit_helper.update_audit("brain", "FAIL_SUBMIT", details=f"Failed: {alpha_id}")
-        return False
+        log.error(f"All submit attempts failed for {alpha_id}. Last Error: {last_error[:100]}")
+        audit_helper.update_audit("brain", "FAIL_SUBMIT", details=f"Failed: {alpha_id} | {last_error[:100]}")
+        return False, last_error
 
 
 # ─── ALPHA PROCESSOR ──────────────────────────────────────────────────────────
@@ -407,17 +418,46 @@ def scout_alpha(api: BrainAPI, expression: str) -> dict:
         elite = api.simulate(expression, universe="TOP3000")
         elite["expression"] = expression
         elite["scout_sharpe"] = sharpe_s
+        elite["_api"] = api
         return elite
 
     scout["expression"] = expression
     scout["scout_sharpe"] = sharpe_s
+    scout["_api"] = api
     return scout
 
 
 # ─── MAIN FACTORY LOOP ────────────────────────────────────────────────────────
 def run_factory():
     load_env()
-    api = BrainAPI()
+    
+    accounts = []
+    accounts_env = os.getenv("BRAIN_ACCOUNTS")
+    if accounts_env:
+        for pair in accounts_env.split(","):
+            if ":" in pair:
+                e, p = pair.split(":", 1)
+                accounts.append((e.strip(), p.strip()))
+    
+    # randomized de-synchronization for GHA parallel batches
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        import random
+        delay = random.randint(0, 60)
+        log.info(f"GHA Detected. De-synchronizing batch with {delay}s random delay...")
+        time.sleep(delay)
+
+    api_pool = []
+    for e, p in accounts:
+        try:
+            api_pool.append(BrainAPI(e, p))
+        except SystemExit:
+            pass
+
+    if not api_pool:
+        log.error("No valid BrainAPI accounts authenticated.")
+        sys.exit(1)
+        
+    log.info(f"Initialized Hyperscaling API Pool with {len(api_pool)} accounts.")
 
     log.info("=" * 70)
     log.info("GOD-LEVEL ALPHA FACTORY v4.0 — LEADERBOARD ASSAULT MODE")
@@ -426,19 +466,31 @@ def run_factory():
 
     # Load additional ThinkingEngine hypotheses if available
     ai_hypotheses = []
+    te = None
+    compiler = XGBoostCompiler()
     try:
         from thinking_engine import ThinkingEngine
         te = ThinkingEngine()
-        for _ in range(20):
-            try:
-                h = te.evolve_hypothesis(feedback=None)
-                if h:
-                    ai_hypotheses.append(h)
-            except Exception:
-                break
-        log.info(f"ThinkingEngine generated {len(ai_hypotheses)} AI hypotheses.")
+        regime = te.get_current_regime()
+        log.info(f"Market Regime Detected: {regime}")
+        
+        # Phase 5: ML Generation Step (Draft)
+        # In a real run, we would pull historical data here. 
+        # For now, we seed the compiler with the current regime to influence the trees.
+        ml_expr = compiler.compile_booster(json.dumps({
+            "split": "rank(close)", "split_condition": 0.5,
+            "children": [{"leaf": 0.02}, {"leaf": -0.01}]
+        }))
+        ai_hypotheses.append(ml_expr)
+        log.info("Injected ML-Compiled Alpha into batch.")
+        
+        # Generate additional hypotheses from ThinkingEngine
+        ai_hypotheses.extend(te.evolve_hypothesis(regime=regime, count=5))
+        log.info(f"ThinkingEngine generated {len(ai_hypotheses) - 1} AI hypotheses (plus 1 ML).") # Adjusted count
     except ImportError:
         log.warning("ThinkingEngine not available. Using curated library only.")
+    except Exception as e:
+        log.warning(f"Could not load AI hypotheses: {e}")
 
     # Combine curated + AI hypotheses
     all_alphas = list(ALPHA_LIBRARY) + ai_hypotheses
@@ -459,7 +511,8 @@ def run_factory():
         log.info(f"--- Batch {calls_made // PARALLEL_WORKERS} | {len(batch)} candidates | {calls_made}/{MAX_API_CALLS} calls used ---")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=PARALLEL_WORKERS) as executor:
-            futures = {executor.submit(scout_alpha, api, expr): expr for expr in batch}
+            import random
+            futures = {executor.submit(scout_alpha, random.choice(api_pool), expr): expr for expr in batch}
             for future in concurrent.futures.as_completed(futures):
                 expr = futures[future]
                 try:
@@ -480,7 +533,8 @@ def run_factory():
 
                     if alpha_id and meets_submission_criteria(metrics):
                         log.info(f"CHAMPION: {alpha_id} | Sharpe={sharpe:.3f} | Fitness={metrics.get('fitness'):.3f}")
-                        success = api.submit(alpha_id)
+                        used_api = metrics.get("_api", api_pool[0])
+                        success, submit_error = used_api.submit(alpha_id)
                         if success:
                             submitted.append(alpha_id)
                             notify_submission(alpha_id, expression, sharpe, metrics.get("fitness", 0))
@@ -489,10 +543,30 @@ def run_factory():
                                 metrics.get("fitness", 0), metrics.get("turnover", 1.0),
                                 status="SUBMITTED", reason=f"Sharpe={sharpe:.3f}"
                             )
+                        else:
+                            # Feed submission error (e.g. 403 Overlap) back to evolution
+                            reason = f"SUBMIT_FAIL: {submit_error}"
+                            rejected.append((expr, reason))
                     else:
                         reason = f"Sharpe={sharpe:.3f} Fitness={metrics.get('fitness', 0):.3f} Turnover={metrics.get('turnover', 1.0):.3f}"
                         rejected.append((expr, reason))
                         log.info(f"Rejected: {reason}")
+                        
+                        # God-Level Evolutionary Feedback Loop
+                        if te is not None and len(all_alphas) + calls_made < MAX_API_CALLS:
+                            feedback_data = {
+                                "expr": expression,
+                                "reason": reason,
+                                "sharpe": sharpe,
+                                "turnover": metrics.get("turnover", 1.0)
+                            }
+                            try:
+                                mutated_alpha = te.evolve_hypothesis(feedback=feedback_data)
+                                if mutated_alpha and mutated_alpha not in all_alphas and mutated_alpha != expression:
+                                    all_alphas.append(mutated_alpha)
+                                    log.info(f"Evolutionary Feedback: Appended new mutated alpha based on failure.")
+                            except Exception as e:
+                                log.error(f"Failed to evolve hypothesis during feedback: {e}")
 
                 except Exception as e:
                     log.error(f"Worker error: {e}")

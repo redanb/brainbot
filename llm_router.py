@@ -23,7 +23,12 @@ import sys
 import json
 import time
 import logging
-from typing import TypedDict, Annotated, List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+
 import env_discovery
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -72,7 +77,7 @@ def _load_env_manually():
 _load_env_manually()
 
 # ── Safety Guardrails (RCA-DRIVEN) ──────────────────
-def _safety_gate(system_prompt: str, user_query: str) -> Optional[str]:
+def _safety_gate(system_prompt: str, user_query: str) -> Union[str, None]:
     """
     Analyzes input for PII, secrets, or prompt injection before API call.
     Returns: None if safe, or an error message if blocked.

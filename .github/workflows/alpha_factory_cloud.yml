@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       # These must be configured in GitHub Settings -> Secrets and variables -> Actions
       BRAIN_EMAIL: ${{ secrets.BRAIN_EMAIL }}
       BRAIN_PASSWORD: ${{ secrets.BRAIN_PASSWORD }}

@@ -94,14 +94,35 @@ class ThinkingEngine:
         return True
 
     def get_current_regime(self) -> str:
-        """Determines market regime for context."""
+        """Determines market regime for context using SPX and VIX."""
         try:
-            if MarketProfiler is None:
+            import yfinance as yf
+            import logging
+            logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+            
+            vix = yf.Ticker("^VIX").history(period="1mo")
+            spy = yf.Ticker("^GSPC").history(period="1mo")
+            
+            if vix.empty or spy.empty:
                 return "UNKNOWN"
-            profiler = MarketProfiler(feature_cols=[])
-            regime = profiler.dominant_regime()
-            return regime if regime else "UNKNOWN"
-        except:
+            
+            current_vix = float(vix['Close'].iloc[-1])
+            spy_px = spy['Close'].values
+            spy_returns = float((spy_px[-1] - spy_px[0]) / spy_px[0])
+            
+            if current_vix > 25:
+                regime = "HIGH_VOLATILITY_REVERSION (Favor mean reversion, stat-arb)"
+            elif current_vix < 20 and spy_returns > 0.02:
+                regime = "BULL_MOMENTUM (Favor trend following, price momentum)"
+            elif current_vix < 25 and spy_returns < -0.02:
+                regime = "BEAR_MOMENTUM (Favor short signals, structural factor tilts)"
+            else:
+                regime = "RANGE_BOUND_STAGNANT (Favor low volatility, beta-neutral factors)"
+                
+            logger.info(f"Detected Market Regime: VIX={current_vix:.2f}, SPX_Return={spy_returns:.2%}, State={regime}")
+            return regime
+        except Exception as e:
+            logger.warning(f"Failed to fetch market regime: {e}")
             return "UNKNOWN"
 
 
@@ -197,10 +218,13 @@ FUNDAMENTAL FIELDS: fnd6_fopo, fnd6_ebitda, fnd6_roa, debt_lt, fnd6_equity, fnd6
 
 STRATEGIC GUIDELINES (2026 Season):
 1. TARGET: Sharpe > 1.2, Fitness > 0.9, Turnover < 0.7
-2. MUST: Wrap the final expression in group_neutralize(..., subindustry)
-3. PREFER: Long-window fundamentals (e.g., ts_zscore(fnd6_ebitda, 252)) mixed with short-term price signals
-4. AVOID: Simple `ts_delta(close, N)` or `rank(close)` — oversaturated, always produces low Sharpe
-5. COMBINE: Orthogonal factors. Example: Quality signal (fnd6_roa) + Momentum reversal (ts_rank(-1 * ts_delta(close, 5), 5)) + Volatility adjustment (ts_std_dev)
+2. MUST: Wrap the final expression in group_neutralize(..., neutralization)
+   - Default: subindustry
+   - If previous attempt was REJECTED for Overlap: ROTATE to 'industry' or 'sector'.
+3. PREFER: Long-window fundamentals (e.g., ts_zscore(fnd6_ebitda, 252)) mixed with short-term price signals.
+4. AVOID: Simple `ts_delta(close, N)` or `rank(close)` — these are 100% saturated.
+5. COMBINE: Orthogonal factors. Mix Quality (ROA), Value (EBITDA/EV), and Sentiment (Volume/Returns).
+6. DIVERSITY: If repeating a theme, change the lookback period (e.g., use 60d instead of 20d).
 6. COMPLEXITY: Use nested operators (at least 3-4 levels deep).
 
 6. SYNTAX RULES (NON-NEGOTIABLE):
@@ -233,7 +257,10 @@ OUTPUT: ONLY the raw FASTEXPR string. No markdown. No explanation. No comments."
                     raw_text = "\n".join(raw_text.splitlines()[1:])
             
             # Sanitize and unify syntax
+            # Phase 8: Support neutralization rotation (subindustry, industry, sector)
             hypothesis = raw_text.replace("SUBINDUSTRY", "subindustry")
+            hypothesis = hypothesis.replace("INDUSTRY", "industry")
+            hypothesis = hypothesis.replace("SECTOR", "sector")
             # Force standard operators via regex for common LLM hallucinations
             import re
             hypothesis = re.sub(r"multiply\s*\(([^,]+),\s*([^)]+)\)", r"(\1 * \2)", hypothesis)

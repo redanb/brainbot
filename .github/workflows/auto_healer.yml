@@ -30,6 +30,7 @@ jobs:
         
       - name: Execute Autonomous Fixer (OpenClaw Capability)
         env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPEN_ROUTER_KEY: ${{ secrets.OPEN_ROUTER_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

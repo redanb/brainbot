@@ -14,10 +14,14 @@ VERIFIED OPERATOR NAMES (from /operators endpoint):
 CONFIRMED DATA FIELDS (from working alpha VkEqdPpJ):
   close, open, high, low, volume
 """
+import sys
 from pathlib import Path
+
+# Fix module resolution for local imports
+sys.path.append(str(Path(__file__).resolve().parent))
+
 from datetime import datetime
 import os
-import sys
 import logging
 import json
 import requests
@@ -35,10 +39,11 @@ def get_audit_file():
     return get_master_dir() / "submission_audit.json"
 
 if __name__ == "__main__":
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
 
 logging.basicConfig(
     level=logging.INFO,
@@ -194,19 +199,28 @@ class AuditHelper:
                 "brain": {"total_tries": 0, "successful_submissions": 0, "fail_403": 0, "below_threshold": 0, "history": []},
                 "numerai": {"total_tries": 0, "successful_submissions": 0, "fail_403": 0, "below_threshold": 0, "history": []}
             }
-        
+        if data is None:
+             data = {
+                    "brain": {"total_tries": 0, "successful_submissions": 0, "fail_403": 0, "below_threshold": 0, "history": []},
+                    "numerai": {"total_tries": 0, "successful_submissions": 0, "fail_403": 0, "below_threshold": 0, "history": []}
+                }
+
         if category not in data:
             data[category] = {"total_tries": 0, "successful_submissions": 0, "fail_403": 0, "below_threshold": 0, "history": []}
 
         category_data = data[category]
-        category_data["total_tries"] += 1
+        if not isinstance(category_data, dict):
+            category_data = {"total_tries": 0, "successful_submissions": 0, "fail_403": 0, "below_threshold": 0, "history": []}
+            data[category] = category_data
+
+        category_data["total_tries"] = int(category_data.get("total_tries", 0)) + 1
 
         if status == "SUCCESS":
-            category_data["successful_submissions"] += 1
+            category_data["successful_submissions"] = int(category_data.get("successful_submissions", 0)) + 1
         elif status == "FAIL_403":
-            category_data["fail_403"] += 1
+            category_data["fail_403"] = int(category_data.get("fail_403", 0)) + 1
         elif status == "BELOW_THRESHOLD":
-            category_data["below_threshold"] += 1
+            category_data["below_threshold"] = int(category_data.get("below_threshold", 0)) + 1
         # Add other status handling as needed
 
         entry = {
@@ -214,8 +228,13 @@ class AuditHelper:
             "status": status,
             "details": details if details is not None else {}
         }
-        category_data["history"].append(entry)
-        category_data["history"] = category_data["history"][-200:] # Keep last 200 entries
+        if not isinstance(category_data.get("history"), list):
+            category_data["history"] = []
+        
+        history_list = category_data["history"]
+        if isinstance(history_list, list):
+            history_list.append(entry)
+            category_data["history"] = history_list[-200:] # Keep last 200 entries
 
         try:
             audit_file.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")

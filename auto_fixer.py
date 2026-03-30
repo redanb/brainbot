@@ -13,9 +13,20 @@ sys.path.append(str(Path.cwd()))
 import env_discovery
 try:
     from llm_router import route_query
-except (ImportError, NameError, SyntaxError) as e:
-    print(f"CRITICAL: Failed to import llm_router: {e}. Using fallback MinimalRouter.")
-    route_query = None # Defined later in fallback logic if needed
+except Exception as e:
+    print(f"CRITICAL: Primary llm_router import failed: {e}. Failsafe initialized.")
+    route_query = None
+
+def get_route_query():
+    """Returns route_query or falls back to failsafe_llm."""
+    if route_query:
+        return route_query
+    
+    try:
+        from failsafe_llm import call_failsafe_gemini
+        return call_failsafe_gemini
+    except ImportError:
+        return lambda sys, usr, **kwargs: {"text": "ERROR: Total AI Failure. No Failsafe available."}
 
 log = logging.getLogger("AutoFixer")
 
@@ -114,7 +125,9 @@ Failure Summary:
 Write a python script that will locally edit the necessary files to fix this issue.
 Assume the script runs in the repository root.
 """
-        response = route_query(system_prompt, user_prompt, depth="REASONING", preferred_provider="openrouter")
+        # Call the resilient route query
+        resilient_query = get_route_query()
+        response = resilient_query(system_prompt, user_prompt, depth="REASONING", preferred_provider="openrouter")
         text = response.get("text", "")
         
         # Extract python code

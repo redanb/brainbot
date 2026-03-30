@@ -48,7 +48,13 @@ def _load_log() -> dict:
     return {"brain": [], "numerai": []}
 
 def _save_log(data: dict):
-    TRACKER_FILE.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+    with open(TRACKER_FILE, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, indent=2, default=str))
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except Exception:
+            pass
 
 def log_brain_submission(alpha_id: str, expression: str, sharpe: float, 
                           fitness: float, turnover: float, returns: float = 0.0, 

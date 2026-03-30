@@ -6,7 +6,10 @@ on:
     - cron: '0 * * * *'  # Every hour, 24/7
 
 env:
+  # RCA-3 FIX: Force all JavaScript actions to Node.js 24 globally
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+  ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: "node20"
 
 jobs:
   trinity-batch:
@@ -14,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        batch: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        batch: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
 
     env:
       BRAIN_EMAIL: ${{ secrets.BRAIN_EMAIL }}
@@ -32,8 +35,9 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       ANTIGRAVITY_AUTO_TRIGGER: "true"
-      MAX_API_CALLS: "80"
+      MAX_API_CALLS: "200"
       ANTIGRAVITY_MASTER_DIR: "/home/runner/work/brainbot/brainbot/.antigravity/master"
+      BATCH_ID: ${{ matrix.batch }}
 
     steps:
       - name: Checkout Repository
@@ -54,13 +58,29 @@ jobs:
         run: mkdir -p $ANTIGRAVITY_MASTER_DIR
 
       - name: Pre-Flight Health Check
-        run: python health_check.py
+        run: |
+          echo "Staggering pre-flight check (up to 300s) to avoid API collisions..."
+          sleep $(( (RANDOM % 300) + 1 ))
+          python health_check.py
+
 
       - name: Run Trinity Pulse Alpha Factory
+        # RCA-1 FIX: continue-on-error so Sentinel Agent always runs for reporting
+        # even when the factory raises a ConnectionError or runtime exception
+        continue-on-error: true
+        env:
+          FACTORY_ERROR_LOG: ${{ env.ANTIGRAVITY_MASTER_DIR }}/error_log.json
         run: |
           echo "=== BATCH ${{ matrix.batch }} STARTING ==="
           python alpha_factory.py
           echo "=== BATCH ${{ matrix.batch }} COMPLETE ==="
+
+      - name: Upload Trinity Log Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: evolution-log-batch-${{ matrix.batch }}
+          path: ${{ env.ANTIGRAVITY_MASTER_DIR }}/evolution_log.json
+          retention-days: 1
 
       - name: Sentinel Agent Reporting
         if: always()
@@ -69,3 +89,66 @@ jobs:
           WORKFLOW_CONCLUSION: ${{ job.status }}
         run: python sentinel_agent.py
 
+      - name: Auto-Healer Feedback Loop
+        # RCA-4: Run auto-healer on failure to log, analyze, and commit fixes
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          echo "=== AUTO-HEALER ACTIVATED for Batch ${{ matrix.batch }} ==="
+          python gha_auto_healer.py || echo "Auto-healer completed (errors logged)"
+
+  trinity-conclusion:
+    # RCA-AUTOMATION: Run after all batches to merge and burst submit
+    needs: [trinity-batch]
+    runs-on: ubuntu-latest
+    if: always()
+    env:
+      BRAIN_EMAIL: ${{ secrets.BRAIN_EMAIL }}
+      BRAIN_PASSWORD: ${{ secrets.BRAIN_PASSWORD }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      ANTIGRAVITY_MASTER_DIR: "/home/runner/work/brainbot/brainbot/.antigravity/master"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pandas xgboost numpy
+
+      - name: Create Master Directory
+        run: mkdir -p $ANTIGRAVITY_MASTER_DIR
+
+      - name: Download All Batch Logs
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: evolution-log-batch-*
+
+      - name: Merge Logs
+        run: python log_merger.py artifacts $ANTIGRAVITY_MASTER_DIR/evolution_log.json
+
+      - name: Run Submission Burst
+        run: |
+          echo "=== TRINITY AUTOMATED BURST STARTING ==="
+          python submission_burst.py
+          echo "=== TRINITY AUTOMATED BURST COMPLETE ==="
+
+      - name: Upload Consolidated Results
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trinity-consolidated-audit
+          path: |
+            ${{ env.ANTIGRAVITY_MASTER_DIR }}/evolution_log.json
+            ${{ env.ANTIGRAVITY_MASTER_DIR }}/submission_audit.json

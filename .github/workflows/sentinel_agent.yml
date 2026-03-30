@@ -12,6 +12,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion != 'skipped' }}
     
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       ANTIGRAVITY_MASTER_DIR: "/home/runner/work/brainbot/brainbot/.antigravity/master"
       WORKFLOW_STATUS: ${{ github.event.workflow_run.status }}

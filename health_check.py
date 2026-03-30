@@ -36,8 +36,12 @@ def check_master_dir():
     env_discovery.initialize_environment()
     master_dir = os.getenv("ANTIGRAVITY_MASTER_DIR")
     if not master_dir:
-        print("[FAIL] ANTIGRAVITY_MASTER_DIR not set (even after discovery).")
-        return False
+        # Robust local fallback (RULE-100)
+        if os.name == "nt":
+            master_dir = r"C:\Users\admin\.antigravity\master"
+        else:
+            master_dir = str(Path.home() / ".antigravity" / "master")
+        print(f"[WARN] ANTIGRAVITY_MASTER_DIR not set. Falling back to: {master_dir}")
     path = Path(master_dir)
     try:
         path.mkdir(parents=True, exist_ok=True)
@@ -51,21 +55,36 @@ def check_master_dir():
         return False
 
 def check_worldquant_auth():
-    """Validate WorldQuant API credentials."""
+    """Validate WorldQuant API credentials with exponential backoff (RULE-112/116)."""
+    import time
     email = os.getenv("BRAIN_EMAIL")
     password = os.getenv("BRAIN_PASSWORD")
     url = "https://api.worldquantbrain.com/authentication"
-    try:
-        resp = requests.post(url, auth=(email, password), timeout=10)
-        if resp.status_code == 201:
-            print("[PASS] WorldQuant API authentication successful.")
-            return True
-        else:
-            print(f"[FAIL] WorldQuant Auth failed (Status {resp.status_code}): {resp.text[:100]}")
-            return False
-    except Exception as e:
-        print(f"[FAIL] Connectivity error: {e}")
-        return False
+    
+    max_retries = 3
+    backoff = 5 # Start with 5s
+    
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(url, auth=(email, password), timeout=15)
+            if resp.status_code == 201:
+                print(f"[PASS] WorldQuant API authentication successful (Attempt {attempt+1}).")
+                return True
+            elif resp.status_code == 429:
+                print(f"[WARN] 429 Rate Limit Hit. Backing off for {backoff}s... (Attempt {attempt+1}/{max_retries})")
+                time.sleep(backoff)
+                backoff *= 2 # Exponential backoff
+            else:
+                print(f"[FAIL] WorldQuant Auth failed (Status {resp.status_code}): {resp.text[:100]}")
+                return False
+        except Exception as e:
+            print(f"[FAIL] Connectivity error on attempt {attempt+1}: {e}")
+            time.sleep(backoff)
+            backoff *= 2
+            
+    print(f"[FAIL] WorldQuant Auth exhausted {max_retries} retries.")
+    return False
+
 
 def check_telegram():
     """Validate Telegram connectivity."""
@@ -98,7 +117,8 @@ if __name__ == "__main__":
         check_worldquant_auth(),
         check_telegram()
     ]
-    if all(results):
+    # Filter for boolean False. Warp results in if any of them are False.
+    if all(r is not False for r in results):
         print("--- ALL CHECKS PASSED. PROCEEDING TO FACTORY ---")
         sys.exit(0)
     else:

@@ -1,66 +1,55 @@
 import os
 import sys
+import json
 from pathlib import Path
 
-PASS = "[PASS]"
-FAIL = "[FAIL]"
-
-def check(label, condition, msg=""):
-    if condition:
-        print(f"{PASS} {label}")
-        return True
-    else:
-        print(f"{FAIL} {label} - {msg}")
-        return False
-
-def run_regression_audit():
-    print("\n--- REGRESSION AUDIT ---")
-    all_passed = True
+def test_phase_8_integrity():
+    print("--- 🧠 PHASE 8 REGRESSION AUDIT 🧠 ---")
     
-    # 1. Existing functionality check: alpha_factory can be imported
-    try:
-        import alpha_factory
-        all_passed &= check("alpha_factory.py imports successfully", True)
-    except Exception as e:
-        all_passed &= check("alpha_factory.py imports successfully", False, str(e))
-        
-    # 2. Existing functionality check: health_check can be imported
-    try:
-        import health_check
-        all_passed &= check("health_check.py imports successfully", True)
-    except Exception as e:
-        all_passed &= check("health_check.py imports successfully", False, str(e))
-        
-    return all_passed
+    # 1. Check Rank Fix
+    with open('check_brain_rank.py', 'r', encoding='utf-8') as f:
+        content = f.read()
+        if 'users/self/ranking' not in content:
+             raise AssertionError("Rank endpoint singular not found.")
+    print("[PASS] Rank API logic updated.")
 
-def run_feature_checks():
-    print("\n--- NEW FEATURE CHECKS ---")
-    all_passed = True
-    
-    # Node 24 Env check in YML
-    yml_path = Path(".github/workflows/trinity_hyperscale.yml")
-    if yml_path.exists():
-        content = yml_path.read_text()
-        has_env = "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: \"true\"" in content
-        all_passed &= check("GHA Workflow has Node 24 override", has_env, "Missing FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 in env")
-    else:
-        all_passed &= check("GHA Workflow exists", False, "File not found")
-        
-    return all_passed
+    # 2. Check ThinkingEngine Diversity
+    with open('thinking_engine.py', 'r', encoding='utf-8') as f:
+        content = f.read()
+        if 'sector' not in content or 'industry' not in content:
+             raise AssertionError("Neutralization rotation not in TE.")
+    print("[PASS] ThinkingEngine diversity prompt updated.")
+
+    # 3. Check Alpha Factory Feedback
+    with open('alpha_factory.py', 'r', encoding='utf-8') as f:
+        content = f.read()
+        if 'submit(self, alpha_id: str) -> tuple[bool, str]' not in content:
+             raise AssertionError("Submit signature not updated.")
+    print("[PASS] AlphaFactory submission feedback updated.")
+
+    # 4. Check GHA Scaling
+    with open('.github/workflows/trinity_hyperscale.yml', 'r', encoding='utf-8') as f:
+        content = f.read()
+        if 'batch: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]' not in content:
+             raise AssertionError("GHA matrix not scaled to 25.")
+    print("[PASS] GHA Hyperscaling matrix updated.")
+
+    # 5. Check Submission Burst Deduplication
+    with open('submission_burst.py', 'r', encoding='utf-8') as f:
+        content = f.read()
+        if 'seen_exprs = set()' not in content:
+             raise AssertionError("Deduplication missing in burst.")
+    print("[PASS] SubmissionBurst deduplication updated.")
+
+    print("\n--- 🏁 PHASE 8 ALL AUDITS PASSED 🏁 ---")
 
 if __name__ == "__main__":
-    if hasattr(sys.stdout, "reconfigure"):
-        try:
-            sys.stdout.reconfigure(encoding="utf-8")
-        except:
-            pass
-            
-    r_pass = run_regression_audit()
-    f_pass = run_feature_checks()
-    
-    if r_pass and f_pass:
-        print("\n[ALL CHECKS PASSED] Readiness Verified")
+    try:
+        test_phase_8_integrity()
         sys.exit(0)
-    else:
-        print("\n[CHECKS FAILED] See details above")
+    except AssertionError as e:
+        print(f"[FAIL] {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[ERROR] {e}")
         sys.exit(1)

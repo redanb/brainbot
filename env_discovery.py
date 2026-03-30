@@ -6,6 +6,14 @@ import logging
 
 log = logging.getLogger("EnvDiscovery")
 
+def get_master_dir():
+    """Returns the absolute path to the .antigravity master directory."""
+    if "ANTIGRAVITY_MASTER_DIR" in os.environ:
+        return Path(os.environ["ANTIGRAVITY_MASTER_DIR"])
+    if os.name == 'nt':
+        return Path(r"C:\Users\admin\.antigravity\master")
+    return Path.home() / ".antigravity" / "master"
+
 def discover_env_files():
     """
     Scans multiple locations for .env files and loads them into os.environ.

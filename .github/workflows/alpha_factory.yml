@@ -28,6 +28,7 @@ jobs:
 
       - name: Run Orthogonal Hypothesis Factory
         env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
           BRAIN_EMAIL: ${{ secrets.BRAIN_EMAIL }}
           BRAIN_PASSWORD: ${{ secrets.BRAIN_PASSWORD }}
         run: python alpha_factory.py
