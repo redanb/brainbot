@@ -25,6 +25,11 @@ from pathlib import Path
 from datetime import datetime
 from xgboost_compiler import XGBoostCompiler
 
+try:
+    from offline_simulator import OfflineSimulator
+except ImportError:
+    OfflineSimulator = None
+
 # ─── ENCODING FIX (RULE-086) ──────────────────────────────────────────────────
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -81,9 +86,9 @@ except ImportError:
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 MAX_API_CALLS     = int(os.getenv("MAX_API_CALLS", "80"))
 SCOUT_SHARPE_MIN  = 0.70    # Lowered to 0.70 to increase graduation rate
-SUBMIT_SHARPE_MIN = 1.00    # WQ IQC actual requirement is Sharpe >= 1.0
-SUBMIT_FITNESS_MIN= 0.5     # WQ IQC actual requirement is Fitness >= 0.5
-SUBMIT_TURNOVER_MAX = 0.80  # Relaxed to 0.80 for more liquidity flexibility
+SUBMIT_SHARPE_MIN = 1.25    # WQ IQC core limit is Sharpe >= 1.25
+SUBMIT_FITNESS_MIN= 1.0     # WQ IQC core limit is Fitness >= 1.0
+SUBMIT_TURNOVER_MAX = 0.70  # WQ IQC core limit is Turnover <= 0.70
 PARALLEL_WORKERS  = 5
 RATE_LIMIT_SLEEP  = 15      # Seconds between simulations to avoid 429s.
 
@@ -373,6 +378,20 @@ class BrainAPI:
                 elif r.status_code == 409:
                     log.warning(f"Alpha {alpha_id} already submitted (409 Conflict).")
                     return False, "409_ALREADY_SUBMITTED"
+                elif r.status_code == 403:
+                    try:
+                        err_json = r.json()
+                        failed_checks = [c for c in err_json.get("is", {}).get("checks", []) if c.get("result") == "FAIL"]
+                        if failed_checks:
+                            reasons = [f"{c['name']} (limit: {c.get('limit')}, value: {c.get('value')})" for c in failed_checks]
+                            last_error = f"VALIDATION_FAIL: {', '.join(reasons)}"
+                            log.warning(f"Submit rejected (403 Validation) for {alpha_id}: {last_error}")
+                            return False, last_error
+                    except Exception:
+                        pass
+                    last_error = r.text[:200]
+                    log.warning(f"Submit {attempt+1}/3 failed for {alpha_id}: {r.status_code} {last_error[:60]}")
+                    time.sleep(10)
                 else:
                     last_error = r.text[:200]
                     log.warning(f"Submit {attempt+1}/3 failed for {alpha_id}: {r.status_code} {last_error[:60]}")
@@ -438,6 +457,12 @@ def run_factory():
             if ":" in pair:
                 e, p = pair.split(":", 1)
                 accounts.append((e.strip(), p.strip()))
+    else:
+        # Fallback to single primary account
+        single_e = os.getenv("BRAIN_EMAIL")
+        single_p = os.getenv("BRAIN_PASSWORD")
+        if single_e and single_p:
+            accounts.append((single_e, single_p))
     
     # randomized de-synchronization for GHA parallel batches
     if os.getenv("GITHUB_ACTIONS") == "true":
@@ -454,8 +479,8 @@ def run_factory():
             pass
 
     if not api_pool:
-        log.error("No valid BrainAPI accounts authenticated.")
-        sys.exit(1)
+        log.error("CRITICAL error: No valid BrainAPI accounts authenticated. Verify BRAIN_EMAIL/BRAIN_PASSWORD and BRAIN_ACCOUNTS in GitHub Secrets.")
+        raise RuntimeError("No valid BrainAPI accounts available.")
         
     log.info(f"Initialized Hyperscaling API Pool with {len(api_pool)} accounts.")
 
@@ -493,8 +518,30 @@ def run_factory():
         log.warning(f"Could not load AI hypotheses: {e}")
 
     # Combine curated + AI hypotheses
-    all_alphas = list(ALPHA_LIBRARY) + ai_hypotheses
-    log.info(f"Total alpha candidates: {len(all_alphas)}")
+    raw_alphas = list(ALPHA_LIBRARY) + ai_hypotheses
+    log.info(f"Total raw alpha hypotheses: {len(raw_alphas)}")
+
+    # Vector A: Offline Validation Pre-Flight
+    all_alphas = []
+    if OfflineSimulator:
+        try:
+            log.info("Engaging Offline Simulator (Vector A) for pre-flight constraints...")
+            sim = OfflineSimulator()
+            for i, expr in enumerate(raw_alphas):
+                res = sim.evaluate(expr)
+                s = res.get("sharpe", 0.0)
+                if s >= 0.5:
+                    all_alphas.append(expr)
+                else:
+                    reason = f"OFFLINE_FAIL: {res.get('error') or f'Sharpe {s:.2f} < 0.5'}"
+                    log.debug(f"Dropped offline | {reason} | {expr[:60]}...")
+            log.info(f"Offline Simulation discarded {len(raw_alphas) - len(all_alphas)} unviable alphas. Surviving count: {len(all_alphas)}")
+        except Exception as e:
+            log.error(f"Offline Simulation failed or missing data ({e}). Falling back to full API routing.")
+            all_alphas = raw_alphas
+    else:
+        log.warning("offline_simulator not found, falling back to full API routing.")
+        all_alphas = raw_alphas
 
     submitted = []
     rejected = []
@@ -554,6 +601,12 @@ def run_factory():
                         
                         # God-Level Evolutionary Feedback Loop
                         if te is not None and len(all_alphas) + calls_made < MAX_API_CALLS:
+                            
+                            if "FITNESS" in reason.upper():
+                                reason += " | HINT: To increase Fitness, optimize returns via tight group_neutralize() and shorter ts_delta/ts_delay intervals."
+                            elif "SHARPE" in reason.upper():
+                                reason += " | HINT: To increase Sharpe, reduce volatility by rank-normalizing vectors and combining non-correlated factors."
+
                             feedback_data = {
                                 "expr": expression,
                                 "reason": reason,
