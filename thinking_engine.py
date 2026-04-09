@@ -65,6 +65,14 @@ except ImportError:
     route_query = None
     logger.error("llm_router not available — SATE offline!")
 
+try:
+    import alpha_validator
+except ImportError:
+    alpha_validator = None
+    logger.warning("alpha_validator not available — syntax linting disabled.")
+
+KARPATHY_HYPOTHESES = MASTER_DIR / "karpathy_hypotheses.json"
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [SATE] - %(levelname)s - %(message)s')
 
 class ThinkingEngine:
@@ -72,25 +80,38 @@ class ThinkingEngine:
         self.blacklist = set()
 
     def _get_seed_alpha(self) -> str:
-        """Alpha-GPT inspired: Start mutations from a validated high-quality seed."""
+        """Alpha-GPT inspired: Start mutations from a validated high-quality seed/research."""
+        # 1. Prefer Karpathy Research Hypotheses
+        if KARPATHY_HYPOTHESES.exists():
+            try:
+                data = json.loads(KARPATHY_HYPOTHESES.read_text(encoding="utf-8"))
+                if data:
+                    # Prefer fresh research (last 10)
+                    choice = random.choice(data[-10:])
+                    logger.info(f"Using KAR hypothesis as seed: {choice['expression'][:40]}...")
+                    return choice['expression']
+            except:
+                pass
+                
+        # 2. Fallback to hardcoded factory seeds
         return random.choice(SEED_LIBRARY)
 
     def _validate_expression(self, expr: str) -> bool:
-        """Pre-flight operator whitelist check — blocks hallucianted invalid operators and repetitive basic factors."""
+        """Pre-flight check using deterministic rules and LLM-linting."""
+        # Baseline deterministic checks
         junk_phrases = ["sorry", "cannot", "sure", "here is", "response", "as an ai", "interface", "healed"]
         if any(j in expr.lower() for j in junk_phrases):
             return False
         if len(expr) < 5 or len(expr) > 2000:
             return False
-        # Block repetitive, overly-simplistic alphas like rank(close) that have high collision
-        if expr.strip() == "rank(close)" or expr.strip() == "group_neutralize(rank(close), SUBINDUSTRY)":
-            logger.warning("Rejected repetitive basic alpha: rank(close)")
-            return False
-        # Add to local temporary blacklist
-        if expr in self.blacklist:
-            logger.warning(f"Rejected expression already in current blacklist loop: {expr[:20]}...")
-            return False
-        self.blacklist.add(expr)
+        
+        # Use a more capable validator if available
+        if alpha_validator:
+            is_valid, reason = alpha_validator.validate_syntax_rules(expr)
+            if not is_valid:
+                logger.warning(f"Deterministic validation failed: {reason}")
+                return False
+        
         return True
 
     def get_current_regime(self) -> str:
@@ -242,14 +263,31 @@ STRATEGIC GUIDELINES (2026 Season):
 
 OUTPUT: ONLY the raw FASTEXPR string. No markdown. No explanation. No comments."""
 
-        logger.info(f"Evolving {mode} hypothesis for regime: {regime} using Deep Reasoning (seed: {seed[:40]}...)")
+        logger.info(f"Evolving {mode} hypothesis for regime: {regime} using Expert Panel Reasoning (seed: {seed[:40]}...)")
         try:
+            # EXPERT PANEL: Require Chain-of-Thought (CoT)
+            system_prompt = (
+                "You are a world-class Quantitative Research AI. "
+                "Step 1: Analyze the market regime and performance history. "
+                "Step 2: Propose a high-intelligence alpha concept. "
+                "Step 3: Transform concept into raw WorldQuant FASTEXPR code. "
+                "Your final line MUST be ONLY the FASTEXPR. No markdown, no comments."
+            )
+            
             result = route_query(
-                system_prompt="You are a world-class Quantitative Research AI specialized in WorldQuant Brain FASTEXPR alpha generation. Your alphas consistently achieve Sharpe > 1.5 and top IQC rankings. You ONLY output raw FASTEXPR expressions — never explanations or markdown.",
+                system_prompt=system_prompt,
                 user_query=prompt,
                 depth="DEEP"
             )
             raw_text = result['text'].strip()
+            
+            # Extract the LAST line as the expression (CoT result)
+            lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
+            hypothesis = lines[-1] if lines else raw_text
+            
+            # Sanitize via AlphaValidator if available
+            if alpha_validator:
+                hypothesis = alpha_validator.solve_common_errors(hypothesis)
             # Extract if wrapped in backticks
             if "```" in raw_text:
                 raw_text = raw_text.split("```")[1]

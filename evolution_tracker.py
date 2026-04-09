@@ -77,13 +77,13 @@ def log_brain_submission(alpha_id: str, expression: str, sharpe: float,
         "reason": reason
     }
     data["brain"].append(entry)
-    # Keep last 60 entries
-    data["brain"] = data["brain"][-60:]
+    # Keep last 500 entries (increased from 60 — was hiding submission history)
+    data["brain"] = data["brain"][-500:]
     _save_log(data)
     
     # Singularity: Auto-commit champions and milestones
-    if status in ["SUBMITTED", "CHAMPION_PENDING"]:
-        _auto_commit_log(f"[skip ci] Autonomous Brain Submission | Alpha {alpha_id} | Sharpe: {sharpe:.2f} | Regime: {regime}")
+    if status in ["SUBMITTED", "CHAMPION_PENDING", "FAILED"]:
+        _auto_commit_log(f"[skip ci] Autonomous Brain Submission | Alpha {alpha_id} | Sharpe: {sharpe:.2f} | Regime: {regime} | Status: {status}")
 
 def log_numerai_submission(model: str, round_num: int, status: str, 
                             correlation: Optional[float] = None, 

@@ -1,0 +1,1 @@
+﻿import json; data = json.load(open(r'C:\Users\admin\.antigravity\master\evolution_log.json', encoding='utf-8')); brain = data.get('brain', []); graduated = [e for e in brain if e.get('status') == 'GRADUATED']; print(f'Graduated count: {len(graduated)}')

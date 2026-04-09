@@ -448,8 +448,88 @@ def _call_xai(system_prompt: str, user_query: str, model: str = "grok-beta", **k
 
 
 # ============================================================
-# PROVIDER 6: Perplexity (Sonar)
+# PROVIDER 5.5: DeepSeek (Direct)
 # ============================================================
+
+def _call_deepseek(system_prompt: str, user_query: str, model: str = "deepseek-chat", **kwargs) -> dict:
+    """
+    Call DeepSeek API directly.
+    DISABLED: 402 Insufficient Balance - Account depleted as of 2026-04-05
+    """
+    raise EnvironmentError("DeepSeek DISABLED: 402 Insufficient Balance. Remove from chain.")  # Fast-fail
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError("DEEPSEEK_API_KEY not set in environment")
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise ImportError("openai package required for DeepSeek. Run: pip install openai")
+
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+
+    start = time.time()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_query}
+        ],
+        temperature=0.3,
+        max_tokens=4096,
+    )
+    latency_ms = int((time.time() - start) * 1000)
+
+    text = response.choices[0].message.content
+    tokens = response.usage.total_tokens
+
+    _log_telemetry("deepseek", "SUCCESS", latency_ms, tokens)
+    logger.info(f"DeepSeek OK - {latency_ms}ms - {tokens} tokens - model={model}")
+
+    return {
+        "text": text, "tokens": tokens, "provider": "deepseek", "model": model, "latency_ms": latency_ms,
+    }
+
+# ============================================================
+# PROVIDER 6: Cerebras (Ultra-Fast)
+# ============================================================
+
+def _call_cerebras(system_prompt: str, user_query: str, model: str = "llama3.1-8b", **kwargs) -> dict:
+    """
+    Call Cerebras Cloud API. Model: llama3.1-8b (confirmed working 2026-04-08)
+    """
+    api_key = os.environ.get("CEREBRAS_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError("CEREBRAS_API_KEY not set in environment")
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise ImportError("openai package required for Cerebras.")
+
+    client = OpenAI(api_key=api_key, base_url="https://api.cerebras.ai/v1")
+
+    start = time.time()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_query}
+        ],
+        temperature=0.3,
+        max_tokens=4096,
+    )
+    latency_ms = int((time.time() - start) * 1000)
+
+    text = response.choices[0].message.content
+    tokens = response.usage.total_tokens
+
+    _log_telemetry("cerebras", "SUCCESS", latency_ms, tokens)
+    logger.info(f"Cerebras OK - {latency_ms}ms - {tokens} tokens - model={model}")
+
+    return {
+        "text": text, "tokens": tokens, "provider": "cerebras", "model": model, "latency_ms": latency_ms,
+    }
 
 def _call_perplexity(system_prompt: str, user_query: str, model: str = "sonar-reasoning", **kwargs) -> dict:
     """
@@ -501,7 +581,10 @@ def _call_github(system_prompt: str, user_query: str, model: str = "gpt-4o", **k
     """
     api_key = os.environ.get("GITHUB_TOKEN", "")
     if not api_key:
-        raise EnvironmentError("GITHUB_TOKEN not set in environment")
+        api_key = os.environ.get("GH_TOKEN", "") # Fallback to secondary name
+    
+    if not api_key:
+        raise EnvironmentError("GITHUB_TOKEN or GH_TOKEN not set in environment")
 
     try:
         from openai import OpenAI
@@ -601,6 +684,8 @@ def _local_template(system_prompt: str, user_query: str, **kwargs) -> dict:
 # ============================================================
 
 PROVIDER_CHAIN = [
+    # ("deepseek", _call_deepseek), # REMOVED: 402 Insufficient Balance
+    ("cerebras", _call_cerebras),
     ("gemini", _call_gemini),
     ("claude", _call_claude),
     ("mistral", _call_mistral),
@@ -633,10 +718,10 @@ def route_query(system_prompt: str, user_query: str, depth: str = "STANDARD",
 
     # Depth -> model mapping
     gemini_model_map = {
-        "FAST": "models/gemini-2.5-flash",
+        "FAST": "models/gemini-2.0-flash",
         "STANDARD": "models/gemini-2.5-flash",
         "DEEP": "models/gemini-2.5-pro",
-        "REASONING": "models/gemini-2.5-flash", # Gemini flash is fast enough for basic reasoning
+        "REASONING": "models/gemini-3.1-flash-live-preview", # Flash 3.1 for live reasoning
     }
 
     groq_model_map = {
@@ -663,8 +748,10 @@ def route_query(system_prompt: str, user_query: str, depth: str = "STANDARD",
     github_model_map = {
         "FAST": "gpt-4o-mini",
         "STANDARD": "gpt-4o",
-        "DEEP": "o1-preview",
-        "REASONING": "o1-mini",
+        "DEEP": "gpt-5", # Preview name from marketplace
+        "REASONING": "DeepSeek-V3", # High-performance reasoning
+        "ALPHA_GEN": "DeepSeek-V3", 
+        "VALIDATE": "gpt-4o-mini"
     }
 
     openrouter_model_map = {
@@ -767,6 +854,14 @@ def route_query(system_prompt: str, user_query: str, depth: str = "STANDARD",
                     return provider_func(system_prompt, user_query, model=model)
                 elif provider_name == "github":
                     model = github_model_map.get(depth, "gpt-4o")
+                    # Special override for ALPHA_GEN tasks via Github
+                    if depth == "REASONING" or depth == "ALPHA_GEN":
+                        model = "DeepSeek-V3"
+                    return provider_func(system_prompt, user_query, model=model)
+                elif provider_name == "deepseek":
+                    model = "deepseek-chat"
+                    if depth == "REASONING" or depth == "ALPHA_GEN":
+                        model = "deepseek-reasoner" # Map to R1 if available
                     return provider_func(system_prompt, user_query, model=model)
                 elif provider_name == "openrouter":
                     model = openrouter_model_map.get(depth, "meta-llama/llama-3.3-70b-instruct:free")

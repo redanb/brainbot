@@ -36,11 +36,12 @@ def list_alphas():
         print(f"Failed to get user info: {me_resp.status_code} {me_resp.text}")
         return
         
-    me_data = me_resp.json().get("user", {})
+    me_data = me_resp.json()
     user_id = me_data.get("id")
     if not user_id:
         print(f"User ID not found in response: {me_resp.text}")
         return
+
     print(f"Authenticated as {me_data.get('username')} (ID: {user_id})")
 
     # 2. Get alphas (filtered by user)

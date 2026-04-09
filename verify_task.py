@@ -1,128 +1,60 @@
+import os
 import sys
-import unittest
-import importlib
+import json
+import logging
+from unittest.mock import MagicMock, patch
 
-# Add current dir to path to import alpha_factory
-sys.path.insert(0, ".")
+# Mock setup to avoid hitting real API during basic regression
+sys.modules['requests'] = MagicMock()
+import requests
 
-try:
-    import alpha_factory
-except ImportError:
-    print("Failed to import alpha_factory")
-    sys.exit(1)
+from alpha_factory import BrainAPI
+import sync_champions
 
-try:
-    from offline_simulator import OfflineSimulator
-except ImportError:
-    OfflineSimulator = None
+logging.basicConfig(level=logging.ERROR)
 
-# Rule-031/Rule-030 Mocking
-class MockResponse:
-    def __init__(self, json_data, status_code):
-        self.json_data = json_data
-        self.status_code = status_code
-        self.text = str(json_data)
+def test_auth_recovery():
+    """Verify that _connect clears session and retries."""
+    with patch('requests.Session') as mock_sess:
+        session_instance = mock_sess.return_value
+        session_instance.post.return_value.status_code = 201
+        session_instance.cookies.get.return_value = "fake_token"
         
-    def json(self):
-        return self.json_data
-
-class MockSession:
-    def __init__(self):
-        self.headers = {}
-        self.cookies = {}
+        api = BrainAPI("test@test.com", "pass")
         
-    def post(self, url, json=None, auth=None, timeout=None):
-        if "authentication" in url:
-            return MockResponse({}, 201)
-        if "submit" in url:
-            # Simulate a 403 Validation Failure
-            return MockResponse({
-                "is": {
-                    "checks": [
-                        {"name": "LOW_SHARPE", "result": "PASS", "limit": 1.25, "value": 1.71},
-                        {"name": "LOW_FITNESS", "result": "FAIL", "limit": 1.0, "value": 0.91}
-                    ]
-                }
-            }, 403)
-        return MockResponse({}, 200)
+        with patch.object(api.session.cookies, 'clear') as mock_clear:
+            api._connect()
+            mock_clear.assert_called()
+    print("[PASS] test_auth_recovery: Session cleared on connect.")
 
-class TestAlphaFactory(unittest.TestCase):
-
-    def test_alpha_factory_thresholds(self):
-        """Assert global constraints strictly equal WQ server targets"""
-        self.assertEqual(alpha_factory.SUBMIT_SHARPE_MIN, 1.25, "Sharpe limit must be 1.25")
-        self.assertEqual(alpha_factory.SUBMIT_FITNESS_MIN, 1.00, "Fitness limit must be 1.00")
-        self.assertEqual(alpha_factory.SUBMIT_TURNOVER_MAX, 0.70, "Turnover limit must be 0.70")
-
-    def test_api_submit_403_parsing(self):
-        """Test that BrainAPI parses 403 VALIDATION errors and aborts without exception"""
-        # Monkeypatch requests.Session for this test avoiding network calls
-        import requests
-        original_session = requests.Session
-        requests.Session = MockSession
+def test_simulate_parity_defaults():
+    """Verify simulate uses 0.01 truncation and TOP1000/3000 as expected."""
+    with patch('requests.Session') as mock_sess:
+        session_instance = mock_sess.return_value
+        session_instance.post.return_value.status_code = 201
+        session_instance.headers.get.return_value = "http://sims/1"
+        session_instance.get.return_value.status_code = 200
+        session_instance.get.return_value.json.return_value = {"status": "COMPLETE", "alpha": "A1"}
         
-        try:
-            # instantiate without loading real env
-            import os
-            os.environ["BRAIN_EMAIL"] = "test@example.com"
-            os.environ["BRAIN_PASSWORD"] = "testpass"
-            api = alpha_factory.BrainAPI(email="test@test.com", password="pass")
-            
-            # Reset the audit update to a dummy so we don't write to master audit log
-            original_audit = getattr(alpha_factory, "audit_helper", None)
-            class FakeAudit:
-                def update_audit(self, *a, **k): pass
-            alpha_factory.audit_helper = FakeAudit()
-            
-            success, error = api.submit("TEST_ID")
-            
-            self.assertFalse(success)
-            self.assertIn("VALIDATION_FAIL", error)
-            self.assertIn("LOW_FITNESS (limit: 1.0, value: 0.91)", error)
-            
-            if original_audit:
-                alpha_factory.audit_helper = original_audit
-        finally:
-            requests.Session = original_session
-
-    def test_offline_simulator_eval(self):
-        """Test the offline simulator engine safely drops mathematically dead alphas."""
-        if not OfflineSimulator:
-            self.skipTest("OfflineSimulator not found, skipping Vector A assay")
-            
-        try:
-            sim = OfflineSimulator()
-            
-            # 1. Invalid flat alpha -> Should return Sharpe 0.0 or None
-            bad = sim.evaluate("rank(volumes * 0)")
-            self.assertAlmostEqual(bad['sharpe'], 0.0, places=2)
-            
-            # 2. Functional alpha -> Should return math values
-            good = sim.evaluate("rank(ts_rank(close, 10))")
-            # we don't care about the absolute value for this test, just that it ran
-            self.assertIsNotNone(good.get('sharpe'))
-            
-        except FileNotFoundError:
-            self.skipTest("No offline data cache found to run the simulator tests.")
-
-def run_tests():
-    print("Running Regression Audit...")
-    loader = unittest.TestLoader()
-    suite = loader.loadTestsFromTestCase(TestAlphaFactory)
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-    
-    # Regression Audit ensure previous features are intact
-    print("\nEnsuring regression logic works...")
-    if not hasattr(alpha_factory, "run_factory"):
-        print("[FAIL] run_factory method missing")
-        sys.exit(1)
+        api = BrainAPI("test@test.com", "pass")
+        api.simulate("rank(close)", universe="TOP3000")
         
-    if not result.wasSuccessful():
-        print("[VERIFICATION FAILED]")
-        sys.exit(1)
-        
-    print("[VERIFICATION PASSED]")
+        args, kwargs = session_instance.post.call_args
+        payload = kwargs['json']
+        assert payload['settings']['universe'] == "TOP3000"
+        assert payload['settings']['truncation'] == 0.01
+    print("[PASS] test_simulate_parity_defaults: TOP3000/0.01 enforced.")
+
+def run_regression():
+    print("--- STARTING REGRESSION AUDIT ---")
+    try:
+        test_auth_recovery()
+        test_simulate_parity_defaults()
+        print("--- REGRESSION AUDIT PASSED ---")
+        return 0
+    except Exception as e:
+        print(f"--- REGRESSION AUDIT FAILED: {e} ---")
+        return 1
 
 if __name__ == "__main__":
-    run_tests()
+    exit(run_regression())

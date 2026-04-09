@@ -1,0 +1,373 @@
+﻿--- User Profile ---
+{
+  "id": "AG13664",
+  "email": "ganurag0117@gmail.com",
+  "telephone": "+919582470596",
+  "firstName": "Anurag",
+  "lastName": "Gupta",
+  "fullName": "Anurag Gupta",
+  "gender": "MALE",
+  "dateCreated": "2026-03-03T04:47:54-05:00",
+  "dateVerified": "2026-03-03T04:49:49-05:00",
+  "dateApproved": "2026-03-03T04:49:49-05:00",
+  "verified": true,
+  "approved": true,
+  "address": {
+    "street": null,
+    "city": null,
+    "state": null,
+    "postalCode": null,
+    "country": "IN"
+  },
+  "education": {
+    "university": "Birla Institute of Technology and Science, Pilani, Goa Campus",
+    "major": null,
+    "degree": null,
+    "stem": null,
+    "graduationYear": null,
+    "gpa": null,
+    "maxGPA": null
+  },
+  "employment": {
+    "employer": "Self-Employed",
+    "business": "AI Automation and Software Development",
+    "title": "Propreitor",
+    "description": "Developing AI-powered automation workflows and medical record processing systems using Python and LLMs",
+    "nonPublicInformation": false,
+    "participationPermitted": true,
+    "finance": false,
+    "investmentAdvisory": null,
+    "brokerage": null,
+    "fundamentalResearch": null,
+    "proprietaryTrading": null,
+    "serviceEngagement": null,
+    "employerServices": null,
+    "exposureStatus": false,
+    "exposureDetails": null
+  },
+  "recruitment": null,
+  "resume": null,
+  "image": null,
+  "settings": {
+    "allowTracking": true,
+    "communication": {
+      "allowSMS": null
+    },
+    "privacy": {},
+    "client": {}
+  },
+  "onboarding": null,
+  "auxiliary": {
+    "campaign": {
+      "campaign": "Brain",
+      "source": "Individual",
+      "medium": "referral",
+      "term": null,
+      "content": null
+    }
+  },
+  "geniusLevel": null
+}
+Ranking fetch failed: 404. Trying stats...
+--- Active Competitions ---
+{
+  "count": 275,
+  "next": "http://api.worldquantbrain.com:443/competitions?limit=10&offset=10",
+  "previous": null,
+  "results": [
+    {
+      "id": "challenge",
+      "name": "Challenge",
+      "description": "Challenge",
+      "universities": null,
+      "countries": null,
+      "excludedCountries": null,
+      "status": "ACCEPTED",
+      "teamBased": false,
+      "startDate": null,
+      "endDate": null,
+      "signUpStartDate": null,
+      "signUpEndDate": null,
+      "signUpDate": "2026-03-03T04:47:55-05:00",
+      "team": null,
+      "scoring": "CHALLENGE",
+      "leaderboard": {
+        "rank": 12307,
+        "user": "AG13664",
+        "level": "BRONZE",
+        "score": 3883.0,
+        "alphas": 2,
+        "university": "Birla Institute of Technology and Science, Pilani, Goa Campus",
+        "country": "IN"
+      },
+      "prizeBoard": false,
+      "universityBoard": false,
+      "submissions": false,
+      "faq": "https://support.worldquantbrain.com/hc/en-us/articles/21210168520855",
+      "progress": {
+        "level": "SILVER",
+        "score": {
+          "bottom": 1000.0,
+          "top": 5000.0,
+          "remaining": 1117.0
+        }
+      }
+    },
+    {
+      "id": "IQC2026S1",
+      "name": "International Quant Championship 2026 Stage 1",
+      "description": "International Quant Championship 2026 Stage 1",
+      "universities": null,
+      "countries": null,
+      "excludedCountries": [
+        "AF",
+        "BR",
+        "BY",
+        "CU",
+        "IR",
+        "IT",
+        "KP",
+        "RU",
+        "SD",
+        "SY",
+        "UA"
+      ],
+      "status": "ACCEPTED",
+      "teamBased": true,
+      "startDate": "2026-03-17T00:00:00-04:00",
+      "endDate": "2026-05-18T23:59:59-04:00",
+      "signUpStartDate": "2026-02-19T00:00:00-05:00",
+      "signUpEndDate": "2026-05-13T23:59:59-04:00",
+      "signUpDate": "2026-03-14T12:02:35-04:00",
+      "team": {
+        "id": "P8b74Zd",
+        "type": "IQC2026S1",
+        "name": "AG13664",
+        "university": "Birla Institute of Technology and Science, Pilani, Goa Campus"
+      },
+      "scoring": "PERFORMANCE",
+      "leaderboard": {
+        "rank": 3715,
+        "team": "AG13664",
+        "members": [
+          "AG13664"
+        ],
+        "qualifierScore": [
+          2000
+        ],
+        "score": 0.0,
+        "d0Score": 0.0,
+        "d1Score": 0.0,
+        "university": "Birla Institute of Technology and Science, Pilani, Goa Campus",
+        "country": "IN"
+      },
+      "prizeBoard": false,
+      "universityBoard": true,
+      "submissions": false,
+      "faq": "https://support.worldquantbrain.com/hc/en-us/categories/12713090684951-IQC-2026",
+      "progress": null
+    },
+    {
+      "id": "DCC2026",
+      "name": "Data Creation Challenge 2026",
+      "description": "Data Creation Challenge 2026",
+      "universities": null,
+      "countries": null,
+      "excludedCountries": null,
+      "status": "EXCLUDED",
+      "teamBased": false,
+      "startDate": "2026-02-23T00:00:00-05:00",
+      "endDate": "2026-04-06T23:59:59-04:00",
+      "signUpStartDate": "2026-02-20T00:00:00-05:00",
+      "signUpEndDate": "2026-03-22T23:59:59-04:00",
+      "signUpDate": null,
+      "team": null,
+      "scoring": "PERFORMANCE",
+      "leaderboard": null,
+      "prizeBoard": false,
+      "universityBoard": false,
+      "submissions": true,
+      "faq": "https://support.worldquantbrain.com/hc/en-us/categories/38468869949847-Data-Creation-Challenge-DCC-2026",
+      "progress": null
+    },
+    {
+      "id": "AIACv2",
+      "name": "AI Alphas Competition 2.0",
+      "description": "AI Alphas Competition 2.0",
+      "universities": null,
+      "countries": null,
+      "excludedCountries": null,
+      "status": "EXCLUDED",
+      "teamBased": false,
+      "startDate": "2026-01-19T00:00:00-05:00",
+      "endDate": "2026-02-15T23:59:59-05:00",
+      "signUpStartDate": "2026-01-19T00:00:00-05:00",
+      "signUpEndDate": "2026-02-08T23:59:59-05:00",
+      "signUpDate": null,
+      "team": null,
+      "scoring": "PERFORMANCE",
+      "leaderboard": null,
+      "prizeBoard": false,
+      "universityBoard": false,
+      "submissions": false,
+      "faq": "https://support.worldquantbrain.com/hc/en-us/categories/37718210038807",
+      "progress": null
+    },
+    {
+      "id": "DataScienceID2025",
+      "name": "Data Science Indonesia - Alphathon 2025",
+      "description": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 500 USD</li>  <li>2nd Place - 300 USD</li>  <li>3rd Place - 200 USD</li>  <li>4th to 10th Place - 100 USD</li>  <li>11th to 20th Place - 50 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for all rules and restrictions.</p>  </div>",
+      "universities": null,
+      "countries": [
+        "ID"
+      ],
+      "excludedCountries": null,
+      "status": "EXCLUDED",
+      "teamBased": false,
+      "startDate": "2026-01-08T00:00:01-05:00",
+      "endDate": "2026-01-31T23:59:59-05:00",
+      "signUpStartDate": "2025-12-17T00:00:01-05:00",
+      "signUpEndDate": "2026-01-31T23:59:59-05:00",
+      "signUpDate": null,
+      "team": null,
+      "scoring": "CHALLENGE",
+      "leaderboard": null,
+      "prizeBoard": false,
+      "universityBoard": false,
+      "submissions": false,
+      "faq": "https://support.worldquantbrain.com/hc/en-us/categories/16638027476759-Alphathon-2025",
+      "progress": null
+    },
+    {
+      "id": "OC2025",
+      "name": "Osmosis Competition 2025",
+      "description": "Osmosis Competition 2025",
+      "universities": null,
+      "countries": null,
+      "excludedCountries": null,
+      "status": "EXCLUDED",
+      "teamBased": false,
+      "startDate": "2025-12-15T00:00:00-05:00",
+      "endDate": "2026-01-04T23:59:59-05:00",
+      "signUpStartDate": "2025-12-12T00:00:00-05:00",
+      "signUpEndDate": "2025-12-27T00:00:00-05:00",
+      "signUpDate": null,
+      "team": null,
+      "scoring": "PERFORMANCE",
+      "leaderboard": null,
+      "prizeBoard": false,
+      "universityBoard": false,
+      "submissions": false,
+      "faq": "https://support.worldquantbrain.com/hc/en-us/categories/36936713611671",
+      "progress": null
+    },
+    {
+      "id": "yerevanstatealphathonAM2025",
+      "name": "Yerevan State University Alphathon 2025",
+      "description": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 500 USD</li>  <li>2nd Place - 300 USD</li>  <li>3rd Place - 200 USD</li>  <li>4th to 10th Place - 100 USD</li>  <li>11th to 20th Place - 50 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for all rules and restrictions.</p>  </div>",
+      "universities": [
+        "Yerevan State University"
+      ],
+      "countries": [
+        "AM"
+      ],
+      "excludedCountries": null,
+      "status": "EXCLUDED",
+      "teamBased": false,
+      "startDate": "2025-11-25T15:00:00-05:00",
+      "endDate": "2025-12-17T14:59:59-05:00",
+      "signUpStartDate": "2025-11-23T15:00:00-05:00",
+      "signUpEndDate": "2025-12-17T14:59:59-05:00",
+      "signUpDate": null,
+      "team": null,
+      "scoring": "CHALLENGE",
+      "leaderboard": null,
+      "prizeBoard": false,
+      "universityBoard": false,
+      "submissions": false,
+      "faq": "https://support.worldquantbrain.com/hc/en-us/categories/16638027476759-Alphathon-2025",
+      "progress": null
+    },
+    {
+      "id": "sunwayalphathonMY2025",
+      "name": "Sunway Alphathon 2025",
+      "description": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 1000 USD</li>  <li>2nd Place - 700 USD</li>  <li>3rd Place - 400 USD</li>  <li>4th to 5th Place - 200 USD</li>  <li>6th to 10th Place - 100 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for all rules and restrictions.</p>  </div>",
+      "universities": [
+        "Sunway University"
+      ],
+      "countries": [
+        "MY"
+      ],
+      "excludedCountries": null,
+      "status": "EXCLUDED",
+      "teamBased": false,
+      "startDate": "2025-11-06T11:00:00-05:00",
+      "endDate": "2025-11-28T10:59:59-05:00",
+      "signUpStartDate": "2025-09-23T12:00:00-04:00",
+      "signUpEndDate": "2025-11-28T10:59:59-05:00",
+      "signUpDate": null,
+      "team": null,
+      "scoring": "CHALLENGE",
+      "leaderboard": null,
+      "prizeBoard": false,
+      "universityBoard": false,
+      "submissions": false,
+      "faq": "https://support.worldquantbrain.com/hc/en-us",
+      "progress": null
+    },
+    {
+      "id": "unmalphathonMY2025",
+      "name": "University of Nottingham Malaysia Alphathon 2025",
+      "description": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 1000 USD</li>  <li>2nd Place - 700 USD</li>  <li>3rd Place - 400 USD</li>  <li>4th to 5th Place - 200 USD</li>  <li>6th to 10th Place - 100 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for all rules and restrictions.</p>  </div>",
+      "universities": [
+        "University of Nottingham Malaysia"
+      ],
+      "countries": [
+        "MY"
+      ],
+      "excludedCountries": null,
+      "status": "EXCLUDED",
+      "teamBased": false,
+      "startDate": "2025-11-05T11:00:00-05:00",
+      "endDate": "2025-11-27T10:59:59-05:00",
+      "signUpStartDate": "2025-09-23T12:00:00-04:00",
+      "signUpEndDate": "2025-11-27T10:59:59-05:00",
+      "signUpDate": null,
+      "team": null,
+      "scoring": "CHALLENGE",
+      "leaderboard": null,
+      "prizeBoard": false,
+      "universityBoard": false,
+      "submissions": false,
+      "faq": "https://support.worldquantbrain.com/hc/en-us",
+      "progress": null
+    },
+    {
+      "id": "apualphathonMY2025",
+      "name": "APU Alphathon 2025",
+      "description": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 1000 USD</li>  <li>2nd Place - 700 USD</li>  <li>3rd Place - 400 USD</li>  <li>4th to 5th Place - 200 USD</li>  <li>6th to 10th Place - 100 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for all rules and restrictions.</p>  </div>",
+      "universities": [
+        "Asia Pacific University of Technology & Innovation (APU)"
+      ],
+      "countries": [
+        "MY"
+      ],
+      "excludedCountries": null,
+      "status": "EXCLUDED",
+      "teamBased": false,
+      "startDate": "2025-11-04T11:00:00-05:00",
+      "endDate": "2025-11-26T10:59:59-05:00",
+      "signUpStartDate": "2025-09-23T12:00:00-04:00",
+      "signUpEndDate": "2025-11-26T10:59:59-05:00",
+      "signUpDate": null,
+      "team": null,
+      "scoring": "CHALLENGE",
+      "leaderboard": null,
+      "prizeBoard": false,
+      "universityBoard": false,
+      "submissions": false,
+      "faq": "https://support.worldquantbrain.com/hc/en-us",
+      "progress": null
+    }
+  ]
+}
