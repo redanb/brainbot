@@ -46,7 +46,7 @@ def list_alphas():
 
     # 2. Get alphas (filtered by user)
     # Use the known working pattern for listing user-owned alphas
-    resp = session.get(f"{base_url}/alphas?user={user_id}&limit=50")
+    resp = session.get(f"{base_url}/alphas?limit=50&offset=0")
     if resp.status_code == 200:
         data = resp.json()
         alphas = data.get("results", [])

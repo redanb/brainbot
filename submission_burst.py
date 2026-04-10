@@ -115,12 +115,12 @@ def perform_submission_burst():
                 if entry.get("alpha_id") == alpha["id"]:
                     entry["status"] = "SUBMITTED"
                     entry["submitted_at"] = datetime.now().isoformat()
-            time.sleep(10) # Safety delay
+            time.sleep(5) # 5s pace to prevent outright 429 locks during heavy burst
         else:
             print(f"Submission failed for {alpha['id']}: {error[:60]}")
         
-        if count >= 10: # Conservative burst limit per run
-            print("Reached batch limit of 10 submissions.")
+        if count >= 50: # Aggressive 10x burst limit per run
+            print("Reached batch limit of 50 submissions.")
             break
 
     # 6. Save Updated Log if anything changed
